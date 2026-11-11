@@ -2,7 +2,7 @@
 import {html, render, useCallback, useEffect, useMemo, useRef, useState} from './vendor/standalone.module.js';
 import * as api from './api.js';
 import {
-  STR, errText, normName, sameName, sessionLabel, seatList, initials,
+  STR, errText, normName, sameName, sessionLabel, seatList, initials, whatsappText,
 } from './format.js';
 import {CAT_PREFIX, UNSURE_ID, isCat, groupBoats, applyOp} from './choices.js';
 import {BoatDiagram} from './boat.js';
@@ -180,9 +180,11 @@ function Main({token}) {
     const drop = (c) => c.ops.filter((o) => o.id !== op.id);
     queue.current = queue.current.then(async () => {
       try {
-        const res = await send(op);
+        await send(op);
         update((c) => ({
-          server: {...c.server, signups: applyOp(c.server.signups, op), version: res.version === undefined ? c.server.version : String(res.version)},
+          // Keep the old version: the refresh below must see the server's version as new, or it would
+          // skip rows a colleague wrote just before this write (version +2 looks "already known").
+          server: {...c.server, signups: applyOp(c.server.signups, op)},
           ops: drop(c),
         }));
         epoch.current++;
@@ -253,6 +255,10 @@ function Main({token}) {
     setShowMine(false);
     scrollTo({top: 0});
   };
+
+  const shareUrl = current
+    ? `https://wa.me/?text=${encodeURIComponent(whatsappText(current, boats, signups, location.href.split('#')[0]))}`
+    : '';
 
   const saveName = (e) => {
     const n = normName(e.target.value);
@@ -337,6 +343,8 @@ function Main({token}) {
           onClick=${() => setShowMine(!showMine)}>
           ${STR.myDates}${mineBySession.length ? ` (${mineBySession.length})` : ''}
         </button>
+        <a class="btn primary" href=${shareUrl || undefined} aria-disabled=${shareUrl ? undefined : 'true'}
+          target="_blank" rel="noopener">${STR.share}</a>
       </div>
     </footer>
   </div>`;

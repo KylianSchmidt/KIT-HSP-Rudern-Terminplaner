@@ -1,4 +1,4 @@
-# Rudern Anmeldung
+# Rudern Terminplaner
 
 Rowing team sign-up. Members open one link (pinned in WhatsApp or taken from a calendar event), type their name and pick a seat in a boat for an upcoming training session. No servers to run, no login for members, all free.
 
