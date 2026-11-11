@@ -294,7 +294,9 @@ function Main({token}) {
         onPick=${() => choose(UNSURE_ID, null, true)} />
       ${groups.map((g) => html`<${Group} key=${g.key} group=${g} me=${me}
         rows=${inSession.filter((r) => r.boat_id === `${CAT_PREFIX}${g.key}`)}
-        seated=${inSession.filter((r) => r.seat !== null && g.boats.some((b) => b.bookable && b.boat_id === r.boat_id)).length}
+        seated=${inSession.filter((r) => r.seat !== null && g.boats.some((b) => b.bookable && b.boat_id === r.boat_id)).length
+          + inSession.filter((r) => r.boat_id === `${CAT_PREFIX}${g.key}`).length}
+        fill=${summaryCat(g, inSession).state}
         places=${g.boats.reduce((n, b) => n + (b.bookable ? b.seats + (b.cox ? 1 : 0) : 0), 0)}
         disabled=${!writable(g.boats.some((b) => b.bookable))}
         busy=${busy.has(`${currentId}|${CAT_PREFIX}${g.key}`)}
@@ -327,6 +329,8 @@ function Main({token}) {
     <main class="main">
       ${fatal && html`<p class="banner error" role="alert">${fatal}</p>`}
       <${Weather} session=${current} />
+      ${status === 'ok' && current && current.status === 'aktiv' && html`<${Summary} total=${inSession.length}
+        cats=${groups.map((g) => summaryCat(g, inSession))} />`}
       ${body}
     </main>
     <footer class="bar">
@@ -352,6 +356,32 @@ function Main({token}) {
   </div>`;
 }
 
+// Fill state of a boat class: 'full' (all places taken), 'open' (some boat is partly filled), else 'none'.
+// People who chose "Egal welches Boot" count as participants of the class but don't occupy a seat yet.
+function summaryCat(g, rows) {
+  const any = rows.filter((r) => r.boat_id === `${CAT_PREFIX}${g.key}`).length;
+  let people = any;
+  let partial = false;
+  let places = 0;
+  g.boats.filter((b) => b.bookable).forEach((b) => {
+    const n = rows.filter((r) => r.boat_id === b.boat_id && r.seat !== null).length;
+    const cap = b.seats + (b.cox ? 1 : 0);
+    people += n;
+    places += cap;
+    if (n > 0 && n < cap) partial = true;
+  });
+  const state = !people ? 'none' : people >= places ? 'full' : partial ? 'open' : 'none';
+  return {key: g.key, label: g.label, klasse: g.klasse, people, state};
+}
+
+function Summary({total, cats}) {
+  return html`<section class="sum" aria-label=${STR.summary}>
+    <span class="sum-total"><strong>${total}</strong> ${STR.participants}</span>
+    <span class="sum-cats">${cats.map((c) => html`<span key=${c.key} class=${`sum-cat ${c.state}`}
+      title=${`${c.label}: ${c.people}`}>${c.klasse}</span>`)}</span>
+  </section>`;
+}
+
 function Dot({name, me}) {
   const mine = me !== '' && sameName(name, me);
   return html`<span class=${`dot${mine ? ' mine' : ''}`} title=${name}>${initials(name)}</span>`;
@@ -367,20 +397,21 @@ function Pool({me, rows, disabled, busy, onPick}) {
       <span class="dots">${rows.length
         ? rows.map((r) => html`<${Dot} key=${r.member_id} name=${r.member_id} me=${me} />`)
         : html`<span class="dot empty" aria-hidden="true"></span>`}</span>
+      <span class="counter">[${rows.length}]</span>
     </button>
   </section>`;
 }
 
-function Group({group, me, rows, seated, places, disabled, busy, onPick, children}) {
+function Group({group, me, rows, seated, places, fill, disabled, busy, onPick, children}) {
   const [open, setOpen] = useState(true);
   return html`<section class=${`group${open ? '' : ' collapsed'}`}>
     <button type="button" class="group-toggle" aria-expanded=${open ? 'true' : 'false'}
       onClick=${() => setOpen(!open)}>
       <h2 class="group-title">${group.label}</h2>
-      <span class=${`counter${seated >= places ? ' full' : ''}`}>[${seated}/${places}]</span>
+      <span class=${`counter ${fill}`}>[${seated}/${places}]</span>
       <span class="chevron" aria-hidden="true"></span>
     </button>
-    <${GroupHead} group=${group} me=${me} rows=${rows} disabled=${disabled} busy=${busy} onPick=${onPick} />
+    ${open && html`<${GroupHead} group=${group} me=${me} rows=${rows} disabled=${disabled} busy=${busy} onPick=${onPick} />`}
     ${open && children}
   </section>`;
 }

@@ -34,6 +34,8 @@ export const STR = {
   fullShort: 'Voll',
   pool: 'Noch ohne Wahl',
   anyBoat: 'Egal welches Boot',
+  summary: 'Übersicht',
+  participants: 'Teilnehmende',
 };
 
 export function errText(code) {

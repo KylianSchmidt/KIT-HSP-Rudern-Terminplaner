@@ -167,6 +167,7 @@ button, input, a.btn { font: inherit; color: inherit; }
 .badge.warn { background: var(--warn); color: var(--warn-fg); }
 .counter { margin-left: auto; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--muted); }
 .counter.full { color: var(--red); }
+.counter.open { color: #d97706; }
 .badge.full { background: var(--red); color: #fff; }
 .muted { color: var(--muted); font-size: 14px; }
 .notes { margin: 2px 0 0; }
@@ -262,16 +263,16 @@ svg.boat.disabled { opacity: .5; }
   min-height: 44px;
   padding: 6px 14px;
   background: var(--card);
-  border: 1px dashed var(--kit);
-  border-radius: 22px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
 }
 .any > span:first-child { flex: none; }
+.any .counter { margin-left: auto; flex: none; }
 .any .dots { flex: 1; gap: 6px; align-items: center; justify-content: flex-start; min-width: 0; }
 .any .dot { flex: none; width: 30px; height: 30px; font-size: 11px; line-height: 1; }
-.any:has(.dot:nth-child(n+4)) { border-radius: 18px; }
 .any[aria-pressed="true"] { border: 2px solid var(--accent); padding: 5px 13px; }
 .any:disabled { opacity: .5; cursor: default; }
 .any:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
@@ -346,3 +347,10 @@ svg.boat.disabled { opacity: .5; }
 .wx-tile strong { font-size: 20px; line-height: 1.2; }
 .wx-tile small { font-size: 13px; font-weight: 400; }
 .wx-none { margin: 0; font-size: 14px; color: var(--muted); }
+
+/* summary under the weather */
+.sum { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; padding: 8px 10px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; font-size: 14px; }
+.sum-cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.sum-cat { padding: 1px 8px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; }
+.sum-cat.open { background: #f59e0b; border-color: #f59e0b; color: #1b2530; }
+.sum-cat.full { background: var(--red); border-color: var(--red); color: #fff; }
