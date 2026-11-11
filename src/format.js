@@ -99,7 +99,7 @@ export function whatsappText(session, boats, signups, pageUrl) {
     const people = seatList(rows).concat(rows.filter((r) => r.seat === null && r.rank !== null)
       .sort((a, b) => a.rank - b.rank)
       .map((r) => `${r.member_id} (${STR.prio} ${r.rank})`));
-    if (people.length) lines.push(`${boat.name} (${boat.typ}): ${people.join(', ')}`);
+    if (people.length) lines.push(`${boat.name} (${boat.klasse}): ${people.join(', ')}`);
   });
   lines.push('', pageUrl);
   return lines.join('\n');

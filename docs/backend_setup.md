@@ -6,7 +6,7 @@ Seven steps in the browser turn the Sheet and calendar into a working API. At th
 
 Do everything below logged into the Google account that owns the Sheet. That account must have edit rights on the calendar, because the script runs as that account.
 
-- Tab `Boote` with headers: Name, Boot\_ID, Klasse, Typ, Steuerperson, Befahrbar, Bemerkungen. Every boat needs a `Boot_ID` (short, no spaces, e.g. `hansa`). `Typ` contains the seat count (1x, 2-, 4x+, 8+).
+- Tab `Boote` with headers: Name, Boot\_ID, Klasse, Typ, Steuerperson, Befahrbar, Bemerkungen. Every boat needs a `Boot_ID` (short, no spaces, e.g. `hansa`). `Klasse` contains the seat configuration (1x, 2-, 4x+, 8+); `Typ` is the boat type (e.g. Gigboot, Rennboot).
 - Tab `Termine` with headers: Name, Termin\_ID, Datum, Beginn, Ende, Status. Leave it empty: the script fills it.
 - Tab `Anmeldungen` with headers: Termin\_ID, Mitglied\_ID, Boot\_ID, Platz, Prio, Geandert. Leave it empty.
 - At least one calendar event in the next 14 days with "@anmeldung" in its description, for testing.

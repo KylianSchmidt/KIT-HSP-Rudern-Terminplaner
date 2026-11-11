@@ -53,7 +53,7 @@ const data = await res.json();
   "ok": true,
   "version": "42",
   "boats": [
-    {"boat_id": "hansa", "name": "Hansa", "klasse": "Gig", "typ": "4x+", "seats": 4,
+    {"boat_id": "hansa", "name": "Hansa", "klasse": "4x+", "typ": "Gigboot", "seats": 4,
      "cox": true, "bookable": true, "notes": "Steuer klemmt leicht"}
   ],
   "sessions": [
@@ -120,7 +120,7 @@ One page, three stacked areas: header, boat list, bottom bar.
 
 **Boat list** (for the selected session)
 
-- One card per boat, in the order of `boats`. Card shows `name`, a `typ` badge, `klasse` and `notes` if present, the diagram, and a short line of who is in the boat.
+- One card per boat, in the order of `boats`. Card shows `name`, a `klasse` badge (seat configuration), `typ` (boat type) and `notes` if present, the diagram, and a short line of who is in the boat.
 - `bookable: false`: card greyed, diagram without tap targets, label "nicht befahrbar". Sort these to the end.
 - In `ranks` or `both` mode, each card has three small toggle buttons "1", "2", "3". The active one is the member's current rank for that boat. Tapping the active one withdraws (`remove`).
 - Wishes from other members appear as a line "Wünsche: Anna (1), Ben (2)".
@@ -163,9 +163,9 @@ export function BoatDiagram({boat, signups, me, disabled, pendingSeat, onSeat}) 
 
 - Top view of a hull: a long, pointed shape, bow on the left, stern on the right.
 - One seat slot per rower, numbered from the bow: seat 1 nearest the bow, seat `seats` (stroke) nearest the stern. Coxed boats (`cox: true`) get one more slot behind the stroke, at the stern, labelled `St`.
-- Sculling boats (`typ` contains `x`): two oar stubs per seat, one on each side.
-- Sweep boats (`typ` contains `-` or `+` but no `x`): one oar stub per seat, alternating sides. Default rig: the stroke seat's oar is on the lower edge, then alternate towards the bow. Keep the rig a constant so it can be flipped later.
-- Seat count comes from `boat.seats`; never parse `typ` for it.
+- Sculling boats (`klasse` contains `x`): two oar stubs per seat, one on each side.
+- Sweep boats (`klasse` contains `-` or `+` but no `x`): one oar stub per seat, alternating sides. Default rig: the stroke seat's oar is on the lower edge, then alternate towards the bow. Keep the rig a constant so it can be flipped later.
+- Seat count comes from `boat.seats`; never parse `klasse` for it.
 
 **Orientation and tap targets**
 

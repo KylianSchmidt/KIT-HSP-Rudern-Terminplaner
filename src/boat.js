@@ -21,9 +21,9 @@ function slotsOf(boat) {
 
 // Sides (-1 / 1) on which seat index i (0 = bow) has an oar.
 function oarSides(boat, i) {
-  const typ = String(boat.typ || '').toLowerCase();
-  if (typ.includes('x')) return [-1, 1];
-  if (typ.includes('-') || typ.includes('+')) {
+  const klasse = String(boat.klasse || '').toLowerCase();
+  if (klasse.includes('x')) return [-1, 1];
+  if (klasse.includes('-') || klasse.includes('+')) {
     return [(boat.seats - 1 - i) % 2 === 0 ? RIG_STROKE_SIDE : -RIG_STROKE_SIDE];
   }
   return [];

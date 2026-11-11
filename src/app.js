@@ -369,8 +369,8 @@ function BoatCard({boat, me, rows, locked, pendingSeats, busy, onSeat, onRank}) 
   return html`<article class=${`card${off ? ' off' : ''}`}>
     <div class="card-head">
       <h2>${boat.name}</h2>
-      <span class="badge">${boat.typ}</span>
-      ${boat.klasse && html`<span class="muted">${boat.klasse}</span>`}
+      <span class="badge">${boat.klasse}</span>
+      ${boat.typ && html`<span class="muted">${boat.typ}</span>`}
       ${off && html`<span class="badge warn">${STR.notBookable}</span>`}
     </div>
     ${boat.notes && html`<p class="muted notes">${boat.notes}</p>`}

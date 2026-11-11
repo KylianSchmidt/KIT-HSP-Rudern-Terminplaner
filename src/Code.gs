@@ -43,8 +43,8 @@ function yes_(v, fallback) {
   return v === true || /^(ja|j|yes|y|true|x|1)$/i.test(String(v).trim());
 }
 
-function seats_(typ) {
-  const m = String(typ).match(/\d+/);
+function seats_(klasse) {
+  const m = String(klasse).match(/\d+/);
   return m ? Number(m[0]) : 0;
 }
 
@@ -110,7 +110,7 @@ function buildState_() {
       name: String(r.Name).trim(),
       klasse: String(r.Klasse).trim(),
       typ: String(r.Typ).trim(),
-      seats: seats_(r.Typ),
+      seats: seats_(r.Klasse),
       cox: yes_(r.Steuerperson, false),
       bookable: yes_(r.Befahrbar, true),
       notes: String(r.Bemerkungen).trim(),
@@ -315,7 +315,7 @@ function syncEvents() {
     const signups = read_(TAB_SIGNUPS).rows;
     const boatNames = {};
     read_(TAB_BOATS).rows.forEach((r) => {
-      boatNames[String(r.Boot_ID).trim()] = String(r.Name).trim() + ' (' + String(r.Typ).trim() + ')';
+      boatNames[String(r.Boot_ID).trim()] = String(r.Name).trim() + ' (' + String(r.Klasse).trim() + ')';
     });
     const written = JSON.parse(cfg_('WRITTEN_BLOCKS', '{}'));
     const nextWritten = {};
