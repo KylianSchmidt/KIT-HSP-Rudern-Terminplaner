@@ -1,6 +1,6 @@
 # Backend setup
 
-Seven steps in the browser turn the Sheet and calendar into a working API. At the end you have a web app URL and a token for the frontend.
+Seven steps in the browser (the [README](../README.md) shows where they fit in the full setup) turn the Sheet and calendar into a working API. At the end you have a web app URL and a token for the frontend.
 
 ## Before you start
 
@@ -16,17 +16,27 @@ Do everything below logged into the Google account that owns the Sheet. That acc
 
 1. In the Sheet: **Extensions → Apps Script**. This creates a script bound to the Sheet. Rename the project to "Rudern Backend".
 2. Click the gear (**Project Settings**), tick **Show "appsscript.json" manifest file in editor**. Back in the editor, open `appsscript.json` and replace its content with the manifest below. It sets the time zone, turns on the advanced Calendar service and sets the web app defaults.
-3. Open `Code.gs`, delete its content, paste the full script from the next section and save (Ctrl+S).
+3. Open `Code.gs`, delete its content, paste the full script from `src/Code.gs` and save (Ctrl+S).
 
 ```json
-I put 
+{
+  "timeZone": "Europe/Berlin",
+  "dependencies": {
+    "enabledAdvancedServices": [
+      {"userSymbol": "Calendar", "serviceId": "calendar", "version": "v3"}
+    ]
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "webapp": {"executeAs": "USER_DEPLOYING", "access": "ANYONE_ANONYMOUS"}
+}
 ```
 
 ## Code.gs
 
 The whole backend in one file. Seats are numbered from 1; the cox seat is `St`. A seat claim replaces the member's other seat in the same session, and ranked wishes (Prio 1 to 3) can sit alongside it.
 
-The code must be added to the Google Apps Scripts workplace. The source code itself is in `src/Code.gs`. Copy paste it from there.
+The source is [`src/Code.gs`](../src/Code.gs). Copy its full content into the Apps Script editor (step 3).
 
 ## Steps 4 to 6: configure, initialise, deploy
 

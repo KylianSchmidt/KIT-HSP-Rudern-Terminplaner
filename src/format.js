@@ -8,7 +8,6 @@ export const STR = {
   cancelled: 'abgesagt',
   locked: 'Anmeldung geschlossen',
   notBookable: 'nicht befahrbar',
-  wishes: 'Wünsche',
   myDates: 'Meine Termine',
   share: 'In WhatsApp teilen',
   offline: 'Keine Verbindung, bitte erneut versuchen',
@@ -26,14 +25,16 @@ export const STR = {
   retry: 'Erneut versuchen',
   inBoat: 'Im Boot',
   nobody: 'Noch niemand angemeldet',
-  prio: 'Prio',
-  prioLabel: (n) => `Wunsch Priorität ${n}`,
   noneMine: 'Du bist noch für keinen Termin angemeldet.',
-  myRank: (rank) => `Wunsch Prio ${rank}`,
   seatN: (seat) => (seat === 'St' ? 'Steuerplatz' : `Platz ${seat}`),
   free: 'frei',
   boatDiagram: (name) => `Boot ${name}`,
   sessions: 'Termine',
+  full: 'Boot voll',
+  fullShort: 'Voll',
+  pool: 'Noch ohne Wahl',
+  poolEmpty: 'Alle haben gewählt',
+  anyBoat: 'Egal welches Boot',
 };
 
 export function errText(code) {
@@ -60,6 +61,13 @@ export function initials(name) {
   return (Array.from(words[0])[0] + Array.from(words[1])[0]).toUpperCase();
 }
 
+// "Anna Weber" -> "Anna W."
+export function shortName(name) {
+  const words = normName(name).split(' ').filter(Boolean);
+  if (words.length < 2) return words[0] || '';
+  return `${words[0]} ${Array.from(words[words.length - 1])[0].toUpperCase()}.`;
+}
+
 const DAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -75,30 +83,22 @@ export function seatOrder(seat) {
   return seat === 'St' ? 99 : Number(seat);
 }
 
-// "1 Anna, 2 Ben, St Carl"
+// "Anna W. (1), Ben K. (2), Carl S. (St)"
 export function seatList(rows) {
   return rows
     .filter((r) => r.seat !== null)
     .sort((a, b) => seatOrder(a.seat) - seatOrder(b.seat))
-    .map((r) => `${r.seat} ${r.member_id}`);
-}
-
-// "Anna (1), Ben (2)"
-export function wishList(rows) {
-  return rows
-    .filter((r) => r.seat === null && r.rank !== null)
-    .sort((a, b) => a.rank - b.rank)
-    .map((r) => `${r.member_id} (${r.rank})`);
+    .map((r) => `${shortName(r.member_id)} (${r.seat})`);
 }
 
 // Session label, one line per boat with people, then the page link (without the token).
 export function whatsappText(session, boats, signups, pageUrl) {
   const lines = [sessionLabel(session)];
+  const rows = signups.filter((r) => r.session_id === session.session_id);
   boats.forEach((boat) => {
-    const rows = signups.filter((r) => r.session_id === session.session_id && r.boat_id === boat.boat_id);
-    const people = seatList(rows).concat(rows.filter((r) => r.seat === null && r.rank !== null)
-      .sort((a, b) => a.rank - b.rank)
-      .map((r) => `${r.member_id} (${STR.prio} ${r.rank})`));
+    const people = rows.filter((r) => r.boat_id === boat.boat_id && r.seat !== null)
+      .sort((a, b) => seatOrder(a.seat) - seatOrder(b.seat))
+      .map((r) => `${shortName(r.member_id)} (${r.seat})`);
     if (people.length) lines.push(`${boat.name} (${boat.klasse}): ${people.join(', ')}`);
   });
   lines.push('', pageUrl);

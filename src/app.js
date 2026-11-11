@@ -1,10 +1,10 @@
 // Root component: state, routing by hash, optimistic writes, polling.
 import {html, render, useCallback, useEffect, useMemo, useRef, useState} from './vendor/standalone.module.js';
-import {MODE} from './config.js';
 import * as api from './api.js';
 import {
-  STR, errText, normName, sameName, sessionLabel, seatList, wishList, whatsappText,
+  STR, errText, normName, sameName, sessionLabel, seatList, initials, whatsappText,
 } from './format.js';
+import {CAT_PREFIX, isCat, groupBoats, applyOp} from './choices.js';
 import {BoatDiagram} from './boat.js';
 
 const POLL_MS = 30000;
@@ -43,6 +43,7 @@ function readHash() {
 
 // A token in the hash always wins over the stored one.
 function readToken() {
+  if (readHash().has('mock')) return 'mock';
   const fromHash = readHash().get('t');
   if (fromHash) {
     store.set(KEY_TOKEN, fromHash);
@@ -57,23 +58,6 @@ function loadCached() {
     if (s && Array.isArray(s.boats) && Array.isArray(s.sessions) && Array.isArray(s.signups)) return s;
   } catch (err) { /* no cache */ }
   return null;
-}
-
-// Mirrors the backend rules so optimistic updates match what the sheet will contain.
-function applyOp(signups, op) {
-  const mine = (r) => r.session_id === op.sid && sameName(r.member_id, op.member);
-  const row = {session_id: op.sid, member_id: op.member, boat_id: op.boat, seat: null, rank: null};
-  if (op.type === 'remove') {
-    return signups.filter((r) => !(mine(r) && r.boat_id === op.boat));
-  }
-  if (op.type === 'seat') {
-    // One seat per member per session; wishes stay.
-    return signups.filter((r) => !(mine(r) && r.seat !== null)).concat({...row, seat: op.seat});
-  }
-  // One wish per boat, one boat per rank.
-  return signups
-    .filter((r) => !(mine(r) && r.seat === null && (r.boat_id === op.boat || r.rank === op.rank)))
-    .concat({...row, rank: op.rank});
 }
 
 let nextOpId = 0;
@@ -183,11 +167,9 @@ function Main({token}) {
 
   // ---- writes ----
 
-  const send = (op) => {
-    if (op.type === 'seat') return api.setSeat(token, op.sid, op.member, op.boat, op.seat);
-    if (op.type === 'rank') return api.setRank(token, op.sid, op.member, op.boat, op.rank);
-    return api.remove(token, op.sid, op.member, op.boat);
-  };
+  const send = (op) => (op.type === 'pick'
+    ? api.pick(token, op.sid, op.member, op.boat, op.seat)
+    : api.remove(token, op.sid, op.member, op.boat, op.seat));
 
   // Optimistic: show the change at once, roll back by dropping the op if the request fails.
   // Requests run one after another so a quick second tap can't overtake the first.
@@ -222,31 +204,20 @@ function Main({token}) {
     return true;
   };
 
-  const writable = (boat) => current && current.status === 'aktiv' && !current.locked && boat.bookable;
+  const writable = (bookable) => current && current.status === 'aktiv' && !current.locked && bookable;
+  const mineRows = signups.filter((r) => r.session_id === currentId && me && sameName(r.member_id, me));
 
-  const onSeat = (boat, seat) => {
-    if (!writable(boat) || needName()) return;
-    const holder = signups.find((r) => r.session_id === currentId && r.boat_id === boat.boat_id && r.seat === seat);
-    if (holder && !sameName(holder.member_id, me)) {
+  // Tap a seat or a category: take it (replacing an earlier choice), or give it up again.
+  const choose = (boatId, seat, bookable) => {
+    if (!writable(bookable) || needName()) return;
+    const holder = signups.find((r) => r.session_id === currentId && r.boat_id === boatId && r.seat === seat);
+    if (seat !== null && holder && !sameName(holder.member_id, me)) {
       showToast(holder.member_id, 2500);
       return;
     }
-    const op = {sid: currentId, member: me, boat: boat.boat_id, seat};
-    submit(holder ? {...op, type: 'remove'} : {...op, type: 'seat'});
-  };
-
-  const onRank = (boat, rank) => {
-    if (!writable(boat) || needName()) return;
-    const op = {sid: currentId, member: me, boat: boat.boat_id};
-    const mineSeat = signups.find((r) => r.session_id === currentId && r.boat_id === boat.boat_id
-      && r.seat !== null && sameName(r.member_id, me));
-    const myRank = signups.find((r) => r.session_id === currentId && r.boat_id === boat.boat_id
-      && r.seat === null && sameName(r.member_id, me));
-    if (myRank && myRank.rank === rank) {
-      submit({...op, type: 'remove', seat: mineSeat && mineSeat.seat});
-    } else {
-      submit({...op, type: 'rank', rank});
-    }
+    const op = {sid: currentId, member: me, boat: boatId, seat};
+    const have = mineRows.some((r) => r.boat_id === boatId && r.seat === seat);
+    submit({...op, type: have ? 'remove' : 'pick'});
   };
 
   // ---- derived view data ----
@@ -256,7 +227,7 @@ function Main({token}) {
   ops.forEach((op) => {
     const key = `${op.sid}|${op.boat}`;
     busy.add(key);
-    if (op.seat) (pendingSeats[key] = pendingSeats[key] || []).push(op.seat);
+    if (op.seat !== null) (pendingSeats[key] = pendingSeats[key] || []).push(op.seat);
   });
 
   const names = useMemo(() => {
@@ -268,7 +239,9 @@ function Main({token}) {
     return [...seen.values()].sort((a, b) => a.localeCompare(b, 'de'));
   }, [signups]);
 
-  const sortedBoats = [...boats].sort((a, b) => (!a.bookable) - (!b.bookable));
+  const groups = useMemo(() => groupBoats(boats), [boats]);
+  const inSession = signups.filter((r) => r.session_id === currentId);
+  const pool = names.filter((n) => !inSession.some((r) => sameName(r.member_id, n)));
   const mineBySession = me
     ? sessions.map((s) => ({
       s,
@@ -294,7 +267,12 @@ function Main({token}) {
 
   // ---- render ----
 
-  const boatName = (id) => (boats.find((b) => b.boat_id === id) || {name: id}).name;
+  const choiceLabel = (r) => {
+    const what = isCat(r.boat_id)
+      ? `${STR.anyBoat}: ${(groups.find((g) => `${CAT_PREFIX}${g.key}` === r.boat_id) || {label: r.boat_id}).label}`
+      : `${(boats.find((b) => b.boat_id === r.boat_id) || {name: r.boat_id}).name}, ${STR.seatN(r.seat)}`;
+    return what;
+  };
 
   let body;
   if (status === 'loading') {
@@ -307,12 +285,18 @@ function Main({token}) {
     body = html`<p class="info">${STR.cancelled}</p>`;
   } else {
     body = html`${current.locked && html`<p class="banner">${STR.locked}</p>`}
-      ${sortedBoats.map((boat) => html`<${BoatCard} key=${boat.boat_id} boat=${boat} me=${me}
-        rows=${signups.filter((r) => r.session_id === currentId && r.boat_id === boat.boat_id)}
-        locked=${current.locked}
-        pendingSeats=${pendingSeats[`${currentId}|${boat.boat_id}`]}
-        busy=${busy.has(`${currentId}|${boat.boat_id}`)}
-        onSeat=${(seat) => onSeat(boat, seat)} onRank=${(rank) => onRank(boat, rank)} />`)}`;
+      <${Pool} names=${pool} me=${me} />
+      ${groups.map((g) => html`<${Group} key=${g.key} group=${g} me=${me}
+        rows=${inSession.filter((r) => r.boat_id === `${CAT_PREFIX}${g.key}`)}
+        disabled=${!writable(g.boats.some((b) => b.bookable))}
+        busy=${busy.has(`${currentId}|${CAT_PREFIX}${g.key}`)}
+        onPick=${() => choose(`${CAT_PREFIX}${g.key}`, null, true)}>
+        ${g.boats.map((boat) => html`<${BoatCard} key=${boat.boat_id} boat=${boat} me=${me}
+          rows=${inSession.filter((r) => r.boat_id === boat.boat_id)}
+          locked=${current.locked}
+          pendingSeats=${pendingSeats[`${currentId}|${boat.boat_id}`]}
+          onSeat=${(seat) => choose(boat.boat_id, seat, boat.bookable)} />`)}
+      </${Group}>`)}`;
   }
 
   return html`<div class="app">
@@ -343,7 +327,7 @@ function Main({token}) {
           ? mineBySession.map(({s, rows}) => html`<button key=${s.session_id} class="mine-item" type="button"
               onClick=${() => selectSession(s.session_id)}>
               <strong>${sessionLabel(s)}</strong>
-              <span>${rows.map((r) => `${boatName(r.boat_id)}: ${r.seat !== null ? STR.seatN(r.seat) : STR.myRank(r.rank)}`).join(' · ')}</span>
+              <span>${rows.map(choiceLabel).join(' · ')}</span>
             </button>`)
           : html`<p class="muted">${STR.noneMine}</p>`}
       </section>`}
@@ -359,33 +343,65 @@ function Main({token}) {
   </div>`;
 }
 
-function BoatCard({boat, me, rows, locked, pendingSeats, busy, onSeat, onRank}) {
+function Dot({name, me}) {
+  const mine = me !== '' && sameName(name, me);
+  return html`<span class=${`dot${mine ? ' mine' : ''}`} title=${name}>${initials(name)}</span>`;
+}
+
+function Pool({names, me}) {
+  return html`<section class="pool" aria-label=${STR.pool}>
+    <h2>${STR.pool} <span class="count">${names.length}</span></h2>
+    <div class="dots">${names.length
+      ? names.map((n) => html`<${Dot} key=${n} name=${n} me=${me} />`)
+      : html`<span class="muted">${STR.poolEmpty}</span>`}</div>
+  </section>`;
+}
+
+function Group({group, me, rows, disabled, busy, onPick, children}) {
+  const [open, setOpen] = useState(true);
+  return html`<section class=${`group${open ? '' : ' collapsed'}`}>
+    <button type="button" class="group-toggle" aria-expanded=${open ? 'true' : 'false'}
+      onClick=${() => setOpen(!open)}>
+      <h2 class="group-title">${group.label}</h2>
+      <span class="group-count">${group.boats.length}</span>
+      <span class="chevron" aria-hidden="true"></span>
+    </button>
+    <${GroupHead} group=${group} me=${me} rows=${rows} disabled=${disabled} busy=${busy} onPick=${onPick} />
+    ${open && children}
+  </section>`;
+}
+
+function GroupHead({group, me, rows, disabled, busy, onPick}) {
+  const mine = me ? rows.find((r) => sameName(r.member_id, me)) : null;
+  return html`<div class="group-head">
+    <button type="button" class="any" aria-pressed=${mine ? 'true' : 'false'}
+      disabled=${disabled || busy} onClick=${onPick}>
+      <span class="what">${STR.anyBoat}</span>
+      <span class="dots">${rows.length
+        ? rows.map((r) => html`<${Dot} key=${r.member_id} name=${r.member_id} me=${me} />`)
+        : html`<span class="dot empty" aria-hidden="true"></span>`}</span>
+    </button>
+  </div>`;
+}
+
+function BoatCard({boat, me, rows, locked, pendingSeats, onSeat}) {
   const seated = rows.filter((r) => r.seat !== null);
-  const wished = rows.filter((r) => r.seat === null && r.rank !== null);
-  const others = wished.filter((r) => !sameName(r.member_id, me));
-  const mine = me ? wished.find((r) => sameName(r.member_id, me)) : null;
+  const places = boat.seats + (boat.cox ? 1 : 0);
   const off = !boat.bookable;
   const frozen = locked || off;
   return html`<article class=${`card${off ? ' off' : ''}`}>
     <div class="card-head">
       <h2>${boat.name}</h2>
       <span class="badge">${boat.klasse}</span>
-      ${boat.typ && html`<span class="muted">${boat.typ}</span>`}
+      <span class=${`counter${seated.length >= places ? ' full' : ''}`}
+        title=${seated.length >= places ? STR.full : ''}>[${seated.length}/${places}]</span>
+      ${seated.length >= places && html`<span class="badge full">${STR.fullShort}</span>`}
       ${off && html`<span class="badge warn">${STR.notBookable}</span>`}
     </div>
     ${boat.notes && html`<p class="muted notes">${boat.notes}</p>`}
-    ${MODE !== 'ranks' && html`<${BoatDiagram} boat=${boat} signups=${seated} me=${me}
-      disabled=${frozen || MODE === 'ranks'} pendingSeat=${pendingSeats} onSeat=${onSeat} />`}
-    ${MODE !== 'seats' && html`<div class="ranks" role="group" aria-label=${STR.prio}>
-      <span class="muted">${STR.prio}</span>
-      ${[1, 2, 3].map((n) => html`<button key=${n} type="button" class="rank"
-        aria-pressed=${mine && mine.rank === n ? 'true' : 'false'} aria-label=${STR.prioLabel(n)}
-        disabled=${frozen || busy} onClick=${() => onRank(n)}>${n}</button>`)}
-    </div>`}
-    <p class="line">${seated.length
-      ? html`<strong>${STR.inBoat}:</strong> ${seatList(seated).join(', ')}`
-      : !off && !others.length && html`<span class="muted">${STR.nobody}</span>`}</p>
-    ${others.length > 0 && html`<p class="line"><strong>${STR.wishes}:</strong> ${wishList(others).join(', ')}</p>`}
+    <${BoatDiagram} boat=${boat} signups=${seated} me=${me} disabled=${frozen}
+      pendingSeat=${pendingSeats} onSeat=${onSeat} />
+    ${seated.length > 0 && html`<p class="line"><strong>${STR.inBoat}:</strong> ${seatList(seated).join(', ')}</p>`}
   </article>`;
 }
 

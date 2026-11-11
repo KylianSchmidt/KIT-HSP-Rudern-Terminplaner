@@ -1,6 +1,9 @@
 // All network code. Every function resolves with the parsed response or throws ApiError.
 // ApiError.code is the backend `error` string, or 'network' / 'bad_response' for client-side failures.
 import {API_URL} from './config.js';
+import * as mock from './mock.js';
+
+const useMock = () => /(^|[#&])mock(=|&|$)/.test(location.hash);
 
 export class ApiError extends Error {
   constructor(code) {
@@ -32,6 +35,7 @@ async function request(url, init) {
 }
 
 export function getState(token) {
+  if (useMock()) return mock.getState();
   return request(`${API_URL}?action=state&t=${encodeURIComponent(token)}`);
 }
 
@@ -40,14 +44,13 @@ function write(payload) {
   return request(API_URL, {method: 'POST', body: JSON.stringify(payload)});
 }
 
-export function setSeat(token, session_id, member_id, boat_id, seat) {
-  return write({action: 'set', t: token, session_id, member_id, boat_id, seat: String(seat)});
+// A choice is a seat in a boat, or (seat = null) a whole boat category 'cat:<key>'.
+export function pick(token, session_id, member_id, boat_id, seat) {
+  if (useMock()) return mock.write({type: 'pick', sid: session_id, member: member_id, boat: boat_id, seat});
+  return write({action: 'set', t: token, session_id, member_id, boat_id, seat: seat === null ? null : String(seat)});
 }
 
-export function setRank(token, session_id, member_id, boat_id, rank) {
-  return write({action: 'set', t: token, session_id, member_id, boat_id, rank});
-}
-
-export function remove(token, session_id, member_id, boat_id) {
-  return write({action: 'remove', t: token, session_id, member_id, boat_id});
+export function remove(token, session_id, member_id, boat_id, seat) {
+  if (useMock()) return mock.write({type: 'remove', sid: session_id, member: member_id, boat: boat_id, seat});
+  return write({action: 'remove', t: token, session_id, member_id, boat_id, seat: seat === null ? null : String(seat)});
 }

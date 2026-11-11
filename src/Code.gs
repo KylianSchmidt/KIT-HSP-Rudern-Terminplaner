@@ -12,7 +12,7 @@ const TAB_BOATS = 'Boote';
 const TAB_SESSIONS = 'Termine';
 const TAB_SIGNUPS = 'Anmeldungen';
 const HEADERS = {
-  Boote: ['Name', 'Boot_ID', 'Klasse', 'Typ', 'Steuerperson', 'Befahrbar', 'Bemerkungen'],
+  Boote: ['Name', 'Boot_ID', 'Klasse', 'Typ', 'Steuerperson', 'Befahrbar', 'Bemerkungen', 'Farbe'],
   Termine: ['Name', 'Termin_ID', 'Datum', 'Beginn', 'Ende', 'Status'],
   Anmeldungen: ['Termin_ID', 'Mitglied_ID', 'Boot_ID', 'Platz', 'Prio', 'Geandert'],
 };
@@ -41,6 +41,15 @@ function fmt_(v, pattern) {
 function yes_(v, fallback) {
   if (v === '' || v === null || v === undefined) return fallback;
   return v === true || /^(ja|j|yes|y|true|x|1)$/i.test(String(v).trim());
+}
+
+const COLORS = ['Lila', 'Gruen', 'Blau', 'Gelb', 'Weiss', 'Rot', 'Braun'];
+
+// Hull colour from the sheet's `Farbe` column; '' when empty or not one of COLORS.
+function color_(v) {
+  const s = String(v == null ? '' : v).trim().toLowerCase()
+    .replace('ü', 'ue').replace('ß', 'ss');
+  return COLORS.find((c) => c.toLowerCase() === s) || '';
 }
 
 function seats_(klasse) {
@@ -114,6 +123,7 @@ function buildState_() {
       cox: yes_(r.Steuerperson, false),
       bookable: yes_(r.Befahrbar, true),
       notes: String(r.Bemerkungen).trim(),
+      color: color_(r.Farbe),
     }))
     .filter((b) => b.boat_id);
 
