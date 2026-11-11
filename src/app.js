@@ -2,9 +2,9 @@
 import {html, render, useCallback, useEffect, useMemo, useRef, useState} from './vendor/standalone.module.js';
 import * as api from './api.js';
 import {
-  STR, errText, normName, sameName, sessionLabel, seatList, initials, whatsappText,
+  STR, errText, normName, sameName, sessionLabel, seatList, initials,
 } from './format.js';
-import {CAT_PREFIX, isCat, groupBoats, applyOp} from './choices.js';
+import {CAT_PREFIX, UNSURE_ID, isCat, groupBoats, applyOp} from './choices.js';
 import {BoatDiagram} from './boat.js';
 
 const POLL_MS = 30000;
@@ -241,7 +241,6 @@ function Main({token}) {
 
   const groups = useMemo(() => groupBoats(boats), [boats]);
   const inSession = signups.filter((r) => r.session_id === currentId);
-  const pool = names.filter((n) => !inSession.some((r) => sameName(r.member_id, n)));
   const mineBySession = me
     ? sessions.map((s) => ({
       s,
@@ -255,10 +254,6 @@ function Main({token}) {
     scrollTo({top: 0});
   };
 
-  const shareUrl = current
-    ? `https://wa.me/?text=${encodeURIComponent(whatsappText(current, boats, signups, location.href.split('#')[0]))}`
-    : '';
-
   const saveName = (e) => {
     const n = normName(e.target.value);
     setName(n);
@@ -268,7 +263,9 @@ function Main({token}) {
   // ---- render ----
 
   const choiceLabel = (r) => {
-    const what = isCat(r.boat_id)
+    const what = r.boat_id === UNSURE_ID
+      ? STR.pool
+      : isCat(r.boat_id)
       ? `${STR.anyBoat}: ${(groups.find((g) => `${CAT_PREFIX}${g.key}` === r.boat_id) || {label: r.boat_id}).label}`
       : `${(boats.find((b) => b.boat_id === r.boat_id) || {name: r.boat_id}).name}, ${STR.seatN(r.seat)}`;
     return what;
@@ -285,9 +282,13 @@ function Main({token}) {
     body = html`<p class="info">${STR.cancelled}</p>`;
   } else {
     body = html`${current.locked && html`<p class="banner">${STR.locked}</p>`}
-      <${Pool} names=${pool} me=${me} />
+      <${Pool} me=${me} rows=${inSession.filter((r) => r.boat_id === UNSURE_ID)}
+        disabled=${!writable(true)} busy=${busy.has(`${currentId}|${UNSURE_ID}`)}
+        onPick=${() => choose(UNSURE_ID, null, true)} />
       ${groups.map((g) => html`<${Group} key=${g.key} group=${g} me=${me}
         rows=${inSession.filter((r) => r.boat_id === `${CAT_PREFIX}${g.key}`)}
+        seated=${inSession.filter((r) => r.seat !== null && g.boats.some((b) => b.boat_id === r.boat_id)).length}
+        places=${g.boats.reduce((n, b) => n + b.seats + (b.cox ? 1 : 0), 0)}
         disabled=${!writable(g.boats.some((b) => b.bookable))}
         busy=${busy.has(`${currentId}|${CAT_PREFIX}${g.key}`)}
         onPick=${() => choose(`${CAT_PREFIX}${g.key}`, null, true)}>
@@ -336,8 +337,6 @@ function Main({token}) {
           onClick=${() => setShowMine(!showMine)}>
           ${STR.myDates}${mineBySession.length ? ` (${mineBySession.length})` : ''}
         </button>
-        <a class="btn primary" href=${shareUrl || undefined} aria-disabled=${shareUrl ? undefined : 'true'}
-          target="_blank" rel="noopener">${STR.share}</a>
       </div>
     </footer>
   </div>`;
@@ -348,22 +347,27 @@ function Dot({name, me}) {
   return html`<span class=${`dot${mine ? ' mine' : ''}`} title=${name}>${initials(name)}</span>`;
 }
 
-function Pool({names, me}) {
+// "Noch ohne Wahl": tap to say you don't know yet which boat; shows everyone who did.
+function Pool({me, rows, disabled, busy, onPick}) {
+  const mine = me ? rows.find((r) => sameName(r.member_id, me)) : null;
   return html`<section class="pool" aria-label=${STR.pool}>
-    <h2>${STR.pool} <span class="count">${names.length}</span></h2>
-    <div class="dots">${names.length
-      ? names.map((n) => html`<${Dot} key=${n} name=${n} me=${me} />`)
-      : html`<span class="muted">${STR.poolEmpty}</span>`}</div>
+    <button type="button" class="any" aria-pressed=${mine ? 'true' : 'false'}
+      disabled=${disabled || busy} onClick=${onPick}>
+      <span class="what">${STR.pool}</span>
+      <span class="dots">${rows.length
+        ? rows.map((r) => html`<${Dot} key=${r.member_id} name=${r.member_id} me=${me} />`)
+        : html`<span class="dot empty" aria-hidden="true"></span>`}</span>
+    </button>
   </section>`;
 }
 
-function Group({group, me, rows, disabled, busy, onPick, children}) {
+function Group({group, me, rows, seated, places, disabled, busy, onPick, children}) {
   const [open, setOpen] = useState(true);
   return html`<section class=${`group${open ? '' : ' collapsed'}`}>
     <button type="button" class="group-toggle" aria-expanded=${open ? 'true' : 'false'}
       onClick=${() => setOpen(!open)}>
       <h2 class="group-title">${group.label}</h2>
-      <span class="group-count">${group.boats.length}</span>
+      <span class=${`counter${seated >= places ? ' full' : ''}`}>[${seated}/${places}]</span>
       <span class="chevron" aria-hidden="true"></span>
     </button>
     <${GroupHead} group=${group} me=${me} rows=${rows} disabled=${disabled} busy=${busy} onPick=${onPick} />

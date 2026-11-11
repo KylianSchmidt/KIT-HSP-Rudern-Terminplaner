@@ -1,4 +1,4 @@
-// Date/time labels, name helpers, WhatsApp text and all UI strings.
+// Date/time labels, name helpers, all UI strings.
 
 export const STR = {
   nameLabel: 'Dein Name',
@@ -9,7 +9,6 @@ export const STR = {
   locked: 'Anmeldung geschlossen',
   notBookable: 'nicht befahrbar',
   myDates: 'Meine Termine',
-  share: 'In WhatsApp teilen',
   offline: 'Keine Verbindung, bitte erneut versuchen',
   err: {
     seat_taken: 'Der Platz wurde gerade vergeben.',
@@ -33,7 +32,6 @@ export const STR = {
   full: 'Boot voll',
   fullShort: 'Voll',
   pool: 'Noch ohne Wahl',
-  poolEmpty: 'Alle haben gewählt',
   anyBoat: 'Egal welches Boot',
 };
 
@@ -91,16 +89,3 @@ export function seatList(rows) {
     .map((r) => `${shortName(r.member_id)} (${r.seat})`);
 }
 
-// Session label, one line per boat with people, then the page link (without the token).
-export function whatsappText(session, boats, signups, pageUrl) {
-  const lines = [sessionLabel(session)];
-  const rows = signups.filter((r) => r.session_id === session.session_id);
-  boats.forEach((boat) => {
-    const people = rows.filter((r) => r.boat_id === boat.boat_id && r.seat !== null)
-      .sort((a, b) => seatOrder(a.seat) - seatOrder(b.seat))
-      .map((r) => `${shortName(r.member_id)} (${r.seat})`);
-    if (people.length) lines.push(`${boat.name} (${boat.klasse}): ${people.join(', ')}`);
-  });
-  lines.push('', pageUrl);
-  return lines.join('\n');
-}

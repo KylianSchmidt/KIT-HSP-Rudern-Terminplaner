@@ -74,7 +74,7 @@ Open `http://localhost:8000/#mock` to use an in-memory fake backend (`src/mock.j
 | `api.js` | All network code |
 | `choices.js` | Choice model (seat or boat category), grouping of boats |
 | `boat.js` | `BoatDiagram`; geometry constants at the top |
-| `format.js` | Date labels, WhatsApp text and **all UI strings** (German) |
+| `format.js` | Date labels and **all UI strings** (German) |
 | `style.css` | Styles, light and dark via `prefers-color-scheme` |
 | `mock.js` | In-memory backend for design previews (`#mock`) |
 | `vendor/standalone.module.js` | Preact + hooks + htm, from `https://unpkg.com/htm@3/preact/standalone.module.js` |

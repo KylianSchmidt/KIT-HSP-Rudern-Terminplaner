@@ -27,8 +27,8 @@ Created by the calendar sync, never by hand. `Termin_ID` is the calendar's insta
 ## Anmeldungen
 
 - `Mitglied_ID` is the display name the member typed (first name and initial). No emails or phone numbers. Names are compared case-insensitively.
-- `Platz` is `1` to the seat count, or `St` for the cox, or empty for a ranked wish. `Prio` is 1 to 3 for a wish, empty for a seat claim.
-- A seat claim replaces the member's other seat in the same session. Wishes can sit alongside a seat (one boat per rank).
+- `Platz` is `1` to the seat count, or `St` for the cox, or empty for a category choice (`Boot_ID` is `cat:<Typ>|<Klasse>`) or "Noch ohne Wahl" (`cat:unsure`). `Prio` is unused.
+- One choice per member and session; a new choice (seat, category or unsure) replaces the old one.
 - `Geandert` is the timestamp of the last change. Together with the Sheet's version history it is the only audit trail.
 - Delete rows of past sessions after one season.
 
@@ -47,4 +47,4 @@ Registering sessions by WhatsApp message is not workable for free: reading group
 
 ## WhatsApp
 
-The link with the token is pinned in the group description. The "In WhatsApp teilen" button opens `https://wa.me/?text=<lineup>` with the lineup as plain text and the page link without the token. `og:title`, `og:description` and `og:image` give the link a preview card.
+The link with the token is pinned in the group description. `og:title`, `og:description` and `og:image` give the link a preview card.

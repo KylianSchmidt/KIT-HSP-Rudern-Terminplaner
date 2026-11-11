@@ -17,7 +17,8 @@ const HEADERS = {
   Anmeldungen: ['Termin_ID', 'Mitglied_ID', 'Boot_ID', 'Platz', 'Prio', 'Geandert'],
 };
 const DAYS_AHEAD = 14;
-const MAX_PRIO = 3;
+const CAT_PREFIX = 'cat:';
+const UNSURE_ID = CAT_PREFIX + 'unsure';  // "Noch ohne Wahl"
 const COX_SEAT = 'St';
 const MARK_START = '--- Boote ---';
 const MARK_END = '--- Ende ---';
@@ -206,8 +207,9 @@ function write_(p) {
     if (!session) return {ok: false, error: 'unknown_session'};
     if (session.status !== 'aktiv') return {ok: false, error: 'cancelled'};
     if (session.locked) return {ok: false, error: 'locked'};
-    const boat = state.boats.find((b) => b.boat_id === String(p.boat_id));
-    if (!boat) return {ok: false, error: 'unknown_boat'};
+    const boatId = String(p.boat_id);
+    const hasSeat = p.seat !== undefined && p.seat !== null && p.seat !== '';
+    const seat = hasSeat ? String(p.seat) : '';
 
     const t = read_(TAB_SIGNUPS);
     const inSession = (r) => String(r.Termin_ID) === session.session_id;
@@ -216,31 +218,30 @@ function write_(p) {
     const stamp = fmt_(new Date(), "yyyy-MM-dd'T'HH:mm:ss");
 
     if (p.action === 'remove') {
-      deleteRows_(t, t.rows.filter((r) => mine(r) && String(r.Boot_ID) === boat.boat_id));
-    } else if (!boat.bookable) {
-      return {ok: false, error: 'boat_unavailable'};
-    } else if (p.seat !== undefined && p.seat !== null && p.seat !== '') {
-      // Seat claim: one seat per member per session.
-      const seat = String(p.seat);
-      const valid = (seat === COX_SEAT && boat.cox) ||
-        (/^\d+$/.test(seat) && Number(seat) >= 1 && Number(seat) <= boat.seats);
-      if (!valid) return {ok: false, error: 'bad_seat'};
-      const taken = t.rows.some((r) => inSession(r) && !mine(r) &&
-        String(r.Boot_ID) === boat.boat_id && String(r.Platz) === seat);
-      if (taken) return {ok: false, error: 'seat_taken'};
-      deleteRows_(t, t.rows.filter((r) => mine(r) && String(r.Platz) !== ''));
-      append_(t, {Termin_ID: session.session_id, Mitglied_ID: member,
-        Boot_ID: boat.boat_id, Platz: seat, Prio: '', Geandert: stamp});
+      // Give up exactly this choice (a seat, or a whole category / "unsure").
+      deleteRows_(t, t.rows.filter((r) => mine(r) && String(r.Boot_ID) === boatId &&
+        String(r.Platz) === seat));
     } else {
-      // Ranked wish: one row per boat, one boat per rank.
-      const rank = Number(p.rank);
-      if (!(Number.isInteger(rank) && rank >= 1 && rank <= MAX_PRIO)) {
-        return {ok: false, error: 'bad_rank'};
+      // One choice per member and session: a new choice replaces the old one.
+      if (hasSeat) {
+        const boat = state.boats.find((b) => b.boat_id === boatId);
+        if (!boat) return {ok: false, error: 'unknown_boat'};
+        if (!boat.bookable) return {ok: false, error: 'boat_unavailable'};
+        const valid = (seat === COX_SEAT && boat.cox) ||
+          (/^\d+$/.test(seat) && Number(seat) >= 1 && Number(seat) <= boat.seats);
+        if (!valid) return {ok: false, error: 'bad_seat'};
+        const taken = t.rows.some((r) => inSession(r) && !mine(r) &&
+          String(r.Boot_ID) === boatId && String(r.Platz) === seat);
+        if (taken) return {ok: false, error: 'seat_taken'};
+      } else if (boatId !== UNSURE_ID) {
+        // Whole category 'cat:<typ>|<klasse>': needs at least one bookable boat.
+        const known = boatId.indexOf(CAT_PREFIX) === 0 && state.boats.some((b) =>
+          b.bookable && CAT_PREFIX + b.typ + '|' + b.klasse === boatId);
+        if (!known) return {ok: false, error: 'unknown_boat'};
       }
-      deleteRows_(t, t.rows.filter((r) => mine(r) && String(r.Platz) === '' &&
-        (String(r.Boot_ID) === boat.boat_id || Number(r.Prio) === rank)));
+      deleteRows_(t, t.rows.filter(mine));
       append_(t, {Termin_ID: session.session_id, Mitglied_ID: member,
-        Boot_ID: boat.boat_id, Platz: '', Prio: rank, Geandert: stamp});
+        Boot_ID: boatId, Platz: seat, Prio: '', Geandert: stamp});
     }
     bump_();
     return {ok: true, version: cfg_('VERSION', '1')};
@@ -283,13 +284,14 @@ function lineupBlock_(sessionId, signups, boatNames) {
   Object.keys(byBoat).sort().forEach((id) => {
     const rows = byBoat[id];
     const seatKey = (r) => (String(r.Platz) === COX_SEAT ? 99 : Number(r.Platz));
-    const seats = rows.filter((r) => r.Platz !== '')
+    const seats = rows.filter((r) => String(r.Platz) !== '')
       .sort((a, b) => seatKey(a) - seatKey(b))
       .map((r) => r.Platz + ' ' + r.Mitglied_ID);
-    const wishes = rows.filter((r) => r.Platz === '')
-      .sort((a, b) => Number(a.Prio) - Number(b.Prio))
-      .map((r) => r.Mitglied_ID + ' (Prio ' + r.Prio + ')');
-    lines.push((boatNames[id] || id) + ': ' + seats.concat(wishes).join(', '));
+    const others = rows.filter((r) => String(r.Platz) === '').map((r) => r.Mitglied_ID);
+    const label = id === UNSURE_ID ? 'Noch ohne Wahl'
+      : id.indexOf(CAT_PREFIX) === 0 ? 'Egal welches Boot, ' + id.slice(CAT_PREFIX.length).replace('|', ' ')
+        : (boatNames[id] || id);
+    lines.push(label + ': ' + seats.concat(others).join(', '));
   });
   lines.push(MARK_END);
   return lines.join('\n');

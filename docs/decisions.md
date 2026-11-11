@@ -24,10 +24,10 @@ Keeping it snappy: render from the `localStorage` cache first, optimistic writes
 | 2 Frontend MVP | in progress (uncommitted changes in `src/`) |
 | 3 Boat diagrams for every type | in progress |
 | 4 Calendar sync: lineup block, lock trigger | backend written; verify end to end |
-| 5 WhatsApp share, OG tags, privacy note, one-week pilot | open |
+| 5 OG tags, privacy note, one-week pilot | open |
 | 6 Handover: second admin, ownership transfer | open |
 
-**Frontend and backend currently disagree.** The frontend works with one choice per member and session, either a seat or a whole boat category (`boat_id = "cat:<typ>|<klasse>"`, no seat). `Code.gs` validates `boat_id` against `Boote` and returns `unknown_boat` for categories, and its `remove` ignores `seat`. Until the backend is extended (or the frontend goes back to seats and ranks), categories only work with `#mock`. The old `MODE` switch (`seats`, `ranks`, `both`) was removed from `config.js`.
+**Backend and frontend agree on one choice per member and session.** A choice is a seat (`boat_id`, `Platz`), a whole category (`boat_id = "cat:<typ>|<klasse>"`, no seat) or "Noch ohne Wahl" (`boat_id = "cat:unsure"`). A new choice replaces the old one; `remove` deletes exactly the given `boat_id` + seat. Ranked wishes (`Prio`) are no longer written; the column stays for old data. The old `MODE` switch (`seats`, `ranks`, `both`) was removed from `config.js`. Redeploy the Apps Script after updating `Code.gs`.
 
 ## Consistency check
 

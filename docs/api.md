@@ -7,7 +7,7 @@ One Apps Script web app (`doGet` / `doPost`), deployed with "Execute as: Me" and
 | Call | Request | Returns |
 | --- | --- | --- |
 | Read state | `GET ?action=state&t=...` | boats, sessions for the next 14 days, signups for those sessions, server `version` |
-| Sign up / change | `POST {action:"set", t, session_id, member_id, boat_id, seat?, rank?}` | `{ok, version}` or `{ok:false, error}` |
+| Sign up / change | `POST {action:"set", t, session_id, member_id, boat_id, seat?}` | `{ok, version}` or `{ok:false, error}` |
 | Withdraw | `POST {action:"remove", t, session_id, member_id, boat_id}` | `{ok, version}` |
 
 - POST bodies are a JSON string sent as `text/plain` with no headers. That avoids the CORS preflight, which Apps Script cannot answer.
@@ -24,6 +24,6 @@ The model is "whoever has the link can sign up", made traceable and reversible r
 - **Nothing secret in the repo:** the repo is public (free GitHub Pages), so it holds only the script URL. Token and calendar ID live in Script Properties. The URL alone grants nothing.
 - **Reads need the token too:** without it the API returns nothing, so member names are not public.
 - **Self-declared identity:** members type their name. Mitigations: the `Geandert` column, the Sheet's version history and admin override in the Sheet. Add a log tab or per-member tokens if impersonation ever happens.
-- **Abuse limits:** one seat per member per session, max rank 3, names up to 40 characters, sessions lock `LOCK_HOURS` before start.
+- **Abuse limits:** one choice per member per session, names up to 40 characters, sessions lock `LOCK_HOURS` before start.
 - **Calendar:** event descriptions contain the token link, so never make the calendar public.
 - **GDPR:** display names only, data stays in the admin's Google account, a short note on the page says what is stored and who to ask for deletion. Delete `Anmeldungen` rows of past sessions after one season.

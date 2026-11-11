@@ -3,6 +3,8 @@
 import {sameName} from './format.js';
 
 export const CAT_PREFIX = 'cat:';
+// "I don't know yet": a choice without a boat, shown as the "Noch ohne Wahl" box.
+export const UNSURE_ID = `${CAT_PREFIX}unsure`;
 export const isCat = (boatId) => String(boatId).startsWith(CAT_PREFIX);
 
 // Gig boats first, then bigger racing boats before smaller ones.

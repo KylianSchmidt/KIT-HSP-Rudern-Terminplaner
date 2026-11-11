@@ -34,7 +34,7 @@ Do everything below logged into the Google account that owns the Sheet. That acc
 
 ## Code.gs
 
-The whole backend in one file. Seats are numbered from 1; the cox seat is `St`. A seat claim replaces the member's other seat in the same session, and ranked wishes (Prio 1 to 3) can sit alongside it.
+The whole backend in one file. Seats are numbered from 1; the cox seat is `St`. Each member has one choice per session: a seat, a whole category (`cat:<Typ>|<Klasse>`) or "Noch ohne Wahl" (`cat:unsure`). A new choice replaces the old one.
 
 The source is [`src/Code.gs`](../src/Code.gs). Copy its full content into the Apps Script editor (step 3).
 
@@ -78,7 +78,7 @@ curl -sL -H 'Content-Type: text/plain' \
   -d '{"action":"remove","t":"'$T'","session_id":"'$SID'","member_id":"Test T","boat_id":"hansa"}' "$URL"
 ```
 
-After step 2 the row appears in `Anmeldungen`; within 10 minutes the event description lists "1 Test T". Possible errors from a write: `unknown_session`, `cancelled`, `locked`, `unknown_boat`, `boat_unavailable`, `bad_seat`, `seat_taken`, `bad_rank`, `bad_name`.
+After step 2 the row appears in `Anmeldungen`; within 10 minutes the event description lists "1 Test T". Possible errors from a write: `unknown_session`, `cancelled`, `locked`, `unknown_boat`, `boat_unavailable`, `bad_seat`, `seat_taken`, `bad_name`.
 
 ## Updating and troubleshooting
 
