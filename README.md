@@ -2,29 +2,62 @@
 
 Rowing team sign-up. Members open one link (pinned in WhatsApp or taken from a calendar event), type their name and pick a seat in a boat for an upcoming training session. No servers to run, no login for members, all free.
 
-## How it works
+## Nutzung (Deutsch)
 
-```
- Member's phone ──► GitHub Pages (static page, src/*.js)
-                        │  fetch, token from URL hash
-                        ▼
-                Google Apps Script web app (src/Code.gs)
-                   │                     ▲
-        reads/writes                     │ every 10 min: scan events
-                   ▼                     │ marked "@anmeldung", write the
-              Google Sheet ◄─────────────┘ link + lineup back into them
-        (Boote, Termine, Anmeldungen)         Google Calendar
+### Google Calendar: 
+
+   - Neuen Termin erstellen unter "HSP Rudern (Allgemein)" Kalendar
+   - Irgendwo in der Beschreibung "@anmeldung" schreiben, das triggert das Google script
+   - Alle 10 minuten wird der Kalendar geupdated, dann entsteht der link zur Umfrage. Das ist der Teil nach "---Boote---", welches automatisch erstellt wird.
+
+   ![alt text](img/gcal.png)
+
+### Terminplaner (Github pages)
+
+   - Kann von den Teilnehmenden ausfüllen lassen
+   - Der Link kann nochmal exportiert werden für Whatsapp
+
+   ![alt text](img/terminplaner.png)
+
+### Google Sheet (für ÜLs)
+
+Es gibt drei Tabs:
+
+   - Liste an Boot aktuell halten zB Bootsschäden, nur für Admins
+   - Liste an Terminen wird automatisch von Google Calendar entnommen (keine Termine im Sheet selbst erstellen, das wird nicht unterstützt)
+   - Liste an Teilnehmenden für jeden Termin wird auch automatisch erstellt
+
+   ![alt text](img/tabelle.png)
+
+### Token Access
+
+Jeder mit dem Link kann auf die Umfrage zugreifen, allerdings hat die Webseite einen Token, der nur durch das Google App Script generiert wird. So können
+nicht Menschen von ausserhalb auf unsere Webseite zugreifen. Ohne Token sieht man nur:
+
+![alt text](img/terminplaner_ohne_token.png)
+
+## Technical breakdown
+
+```mermaid
+flowchart TD
+    Phone["Member's phone"] --> Pages["Terminplaner<br/>(Github Pages)"]
+    Pages -->|"fetch, token from URL hash"| GAS["Google Apps Script"]
+    GAS <-->|"reads/writes"| Sheet[("Google Sheet<br/>(Boote, Termine, Anmeldungen)")]
+    Calendar["Google Calendar"] -->|"Look for @anmeldung"| GAS
+    GAS -->|"Update description"| Calendar
 ```
 
 | Part | Role |
 | --- | --- |
 | **Google Calendar** | Admins create training events and write `@anmeldung` in the description. That registers a session. |
-| **Google Apps Script** | The whole backend: `doGet`/`doPost` API, a 10-minute calendar sync trigger, locking, caching. |
+| **Google Apps Script** | Backend API, a 10-minute calendar sync trigger, locking, caching. |
 | **Google Sheet** | The database. `Boote` is edited by admins; `Termine` and `Anmeldungen` are written by the script. |
-| **GitHub Pages** | Hosts the member-facing page. Preact + htm, vendored, no build step. |
-| **Token** | A secret in the link (`#t=<TOKEN>`). Without it the API returns nothing. The hash never reaches any server log. |
+| **GitHub Pages** | Hosts the member-facing page. Preact + htm with no build step. |
+| **Token** | A secret in the link (`#t=<TOKEN>`). Without it the API returns nothing. The hash only live in GAS (and can be rotated). |
 
-Roles: **members** sign up, change and withdraw. **Admins** (one or two) maintain the boat list and calendar events, and can edit the Sheet directly (for example to fix a crew after sign-ups lock).
+Roles: 
+ - Members sign up, change and withdraw
+ - Admins maintain the boat list and calendar events, and can edit the Sheet directly (for example to fix a crew after sign-ups lock).
 
 ## Set up from scratch
 
