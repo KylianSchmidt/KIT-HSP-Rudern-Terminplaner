@@ -1,6 +1,6 @@
 // Inline-SVG boat diagram, drawn from the boat data only. All geometry lives in the constants below.
 // Units are CSS px (1 SVG unit = 1 CSS px), so every slot is a real SLOT x SLOT tap target.
-import {html, useLayoutEffect, useRef, useState} from './vendor/standalone.module.js';
+import {html} from './vendor/standalone.module.js';
 import {STR, initials, sameName} from './format.js';
 
 const SLOT = 48;          // slot size along and across the boat (>= 48 for touch)
@@ -37,8 +37,8 @@ function oarSides(boat, i) {
 }
 
 export function BoatDiagram({boat, signups, me, disabled, pendingSeat, onSeat}) {
-  const ref = useRef(null);
-  const [horizontal, setHorizontal] = useState(true);
+  // Always horizontal; the SVG scales down via CSS (max-width: 100%) when the card is narrower than the boat.
+  const horizontal = true;
   const slots = slotsOf(boat);
   const gig = /gig/i.test(boat.typ);
   const HULL_W = gig ? HULL_GIG : HULL_RACE;
@@ -51,19 +51,6 @@ export function BoatDiagram({boat, signups, me, disabled, pendingSeat, onSeat}) 
   const mid = across / 2;
   const top = OAR_LEN;
   const bottom = OAR_LEN + HULL_W;
-
-  // Horizontal when the card is wide enough for the whole boat, else vertical (bow at the top).
-  useLayoutEffect(() => {
-    const card = ref.current && ref.current.parentElement;
-    if (!card) return undefined;
-    const fit = (w) => setHorizontal(w >= total);
-    const cs = getComputedStyle(card);
-    fit(card.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const ro = new ResizeObserver((entries) => fit(entries[0].contentRect.width));
-    ro.observe(card);
-    return () => ro.disconnect();
-  }, [total]);
 
   // (a, c) = (along the boat from the bow, across the boat) -> svg coordinates
   const p = (a, c) => (horizontal ? `${a} ${c}` : `${c} ${a}`);
@@ -134,7 +121,7 @@ export function BoatDiagram({boat, signups, me, disabled, pendingSeat, onSeat}) 
   const w = horizontal ? total : across;
   const h = horizontal ? across : total;
   const shift = horizontal ? `${PAD_BOW} 0` : `0 ${PAD_BOW}`;
-  return html`<svg ref=${ref} class=${`boat${disabled ? ' disabled' : ''}`} width=${w} height=${h}
+  return html`<svg class=${`boat${disabled ? ' disabled' : ''}`} width=${w} height=${h}
     viewBox=${`0 0 ${w} ${h}`} role="group" aria-label=${STR.boatDiagram(boat.name)}>
     <g transform=${`translate(${shift})`}>
       ${oars}

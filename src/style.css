@@ -174,7 +174,7 @@ button, input, a.btn { font: inherit; color: inherit; }
 .line:empty { display: none; }
 
 /* boat diagram */
-svg.boat { display: block; margin: 8px auto 0; max-width: none; }
+svg.boat { display: block; margin: 8px auto 0; max-width: 100%; height: auto; }
 svg.boat.disabled { opacity: .5; }
 .boat .hull { fill: var(--hull); stroke: var(--hull-stroke); stroke-width: 1.5; }
 .boat .hull.colored { stroke-width: 4; paint-order: stroke; }

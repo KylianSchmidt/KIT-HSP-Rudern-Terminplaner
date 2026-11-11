@@ -293,8 +293,8 @@ function Main({token}) {
         onPick=${() => choose(UNSURE_ID, null, true)} />
       ${groups.map((g) => html`<${Group} key=${g.key} group=${g} me=${me}
         rows=${inSession.filter((r) => r.boat_id === `${CAT_PREFIX}${g.key}`)}
-        seated=${inSession.filter((r) => r.seat !== null && g.boats.some((b) => b.boat_id === r.boat_id)).length}
-        places=${g.boats.reduce((n, b) => n + b.seats + (b.cox ? 1 : 0), 0)}
+        seated=${inSession.filter((r) => r.seat !== null && g.boats.some((b) => b.bookable && b.boat_id === r.boat_id)).length}
+        places=${g.boats.reduce((n, b) => n + (b.bookable ? b.seats + (b.cox ? 1 : 0) : 0), 0)}
         disabled=${!writable(g.boats.some((b) => b.bookable))}
         busy=${busy.has(`${currentId}|${CAT_PREFIX}${g.key}`)}
         onPick=${() => choose(`${CAT_PREFIX}${g.key}`, null, true)}>
