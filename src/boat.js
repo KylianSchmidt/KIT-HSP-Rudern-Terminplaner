@@ -8,8 +8,9 @@ const HULL_RACE = 34;     // very slim racing shell
 const HULL_GIG = 34;      // gig boat: as narrow as the racing shell
 const PAD_BOW = 19;       // room in front of the hull for the bow ball and the direction arrow
 const PAD_STERN = 2;
-const OAR_LEN = 14;       // oar stub length beyond the hull edge
-const OAR_BLADE = 9;      // thicker blade part at the end of an oar
+const OAR_LEN = 24;       // oar length beyond the hull edge (across the boat)
+const OAR_SWEEP = 12;     // oars are angled this far towards the stern
+const OAR_BLADE = 10;     // thicker blade part at the end of an oar
 const RIG_STROKE_SIDE = 1; // sweep rig: side of the stroke seat's oar; 1 = lower/right edge, -1 = upper/left
 
 // Hull border colour by the sheet's `Farbe` value.
@@ -79,10 +80,13 @@ export function BoatDiagram({boat, signups, me, disabled, pendingSeat, onSeat}) 
     oarSides(boat, i).forEach((side) => {
       const c1 = mid + side * (HULL_W / 2 - 2);
       const c2 = mid + side * (HULL_W / 2 + OAR_LEN);
-      const cb = c2 - side * OAR_BLADE;
+      const t = 1 - OAR_BLADE / (OAR_LEN + 2);             // where the blade starts along the oar
+      const cb = c1 + (c2 - c1) * t;
+      const a2 = a + OAR_SWEEP;                            // the tip points against the direction of travel
+      const ab = a + OAR_SWEEP * t;
       oars.push(html`<g key=${`o${seat}${side}`}>
-        <line class="oar" x1=${x(a, c1)} y1=${y(a, c1)} x2=${x(a, c2)} y2=${y(a, c2)} />
-        <line class="blade" x1=${x(a, cb)} y1=${y(a, cb)} x2=${x(a, c2)} y2=${y(a, c2)} />
+        <line class="oar" x1=${x(a, c1)} y1=${y(a, c1)} x2=${x(a2, c2)} y2=${y(a2, c2)} />
+        <line class="blade" x1=${x(ab, cb)} y1=${y(ab, cb)} x2=${x(a2, c2)} y2=${y(a2, c2)} />
       </g>`);
     });
 

@@ -336,3 +336,13 @@ svg.boat.disabled { opacity: .5; }
   text-align: center;
   box-shadow: 0 2px 10px rgb(0 0 0 / .3);
 }
+
+/* weather panel (under the tabs, above the boats) */
+.wx { margin-bottom: 12px; }
+.wx-title { display: block; font-size: 13px; color: var(--muted); margin-bottom: 2px; }
+.wx-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.wx-tile { display: flex; flex-direction: column; padding: 6px 8px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+.wx-label, .wx-sub { font-size: 12px; color: var(--muted); }
+.wx-tile strong { font-size: 20px; line-height: 1.2; }
+.wx-tile small { font-size: 13px; font-weight: 400; }
+.wx-none { margin: 0; font-size: 14px; color: var(--muted); }

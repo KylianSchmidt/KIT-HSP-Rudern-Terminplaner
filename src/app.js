@@ -6,6 +6,7 @@ import {
 } from './format.js';
 import {CAT_PREFIX, UNSURE_ID, isCat, groupBoats, applyOp} from './choices.js';
 import {BoatDiagram} from './boat.js';
+import {Weather} from './weather.js';
 
 const POLL_MS = 30000;
 const TOAST_MS = 4000;
@@ -325,6 +326,7 @@ function Main({token}) {
     </header>
     <main class="main">
       ${fatal && html`<p class="banner error" role="alert">${fatal}</p>`}
+      <${Weather} session=${current} />
       ${body}
     </main>
     <footer class="bar">

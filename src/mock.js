@@ -10,7 +10,7 @@ for (let i = 1; sessions.length < 6; i++) {
   const d = new Date();
   d.setDate(d.getDate() + i);
   if ([2, 4, 6].includes(d.getDay())) {
-    sessions.push({session_id: `s${sessions.length + 1}`, date: iso(d), start: d.getDay() === 6 ? '10:00' : '18:00',
+    sessions.push({session_id: `s${sessions.length + 1}`, date: iso(d), start: d.getDay() === 6 ? '10:00' : '18:00', end: d.getDay() === 6 ? '12:00' : '20:00',
       status: sessions.length === 3 ? 'abgesagt' : 'aktiv', locked: false});
   }
 }
