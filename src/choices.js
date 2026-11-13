@@ -29,3 +29,23 @@ export function applyOp(signups, op) {
   if (op.type === 'remove') return signups.filter((r) => !(mine(r) && r.boat_id === op.boat && r.seat === seat));
   return signups.filter((r) => !mine(r)).concat({session_id: op.sid, member_id: op.member, boat_id: op.boat, seat});
 }
+
+// Rower levels. Each one recommends a set of boat classes; the page shows those first.
+export const LEVELS = [
+  {id: 'anfaenger', label: 'Anfänger.in', info: 'Empfohlen: Gigboote'},
+  {id: 'allgemein', label: 'Allgemein', info: 'Empfohlen: alle Boote außer dem Einer (1x)'},
+  {id: 'novice', label: 'Novice', info: 'Empfohlen: alle Boote'},
+  {id: 'fortgeschritten', label: 'Fortgeschritten', info: 'Empfohlen: alle Rennboote'},
+];
+export const DEFAULT_LEVELS = ['allgemein'];
+
+const isGig = (g) => /gig/i.test(g.typ);
+const RECOMMEND = {
+  anfaenger: (g) => isGig(g),
+  novice: () => true,
+  allgemein: (g) => g.klasse !== '1x',
+  fortgeschritten: (g) => !isGig(g),
+};
+
+// Several levels can be ticked: a boat class is recommended if any of them recommends it.
+export const isRecommended = (group, levels) => levels.some((l) => RECOMMEND[l] && RECOMMEND[l](group));

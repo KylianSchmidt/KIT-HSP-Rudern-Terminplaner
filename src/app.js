@@ -4,7 +4,7 @@ import * as api from './api.js';
 import {
   STR, errText, normName, sameName, sessionLabel, seatList, initials, whatsappText,
 } from './format.js';
-import {CAT_PREFIX, UNSURE_ID, isCat, groupBoats, applyOp} from './choices.js';
+import {CAT_PREFIX, UNSURE_ID, LEVELS, DEFAULT_LEVELS, isRecommended, isCat, groupBoats, applyOp} from './choices.js';
 import {BoatDiagram} from './boat.js';
 import {Weather} from './weather.js';
 
@@ -13,6 +13,8 @@ const TOAST_MS = 4000;
 const KEY_TOKEN = 'rudern.token';
 const KEY_NAME = 'rudern.name';
 const KEY_STATE = 'rudern.state';
+const KEY_LEVELS = 'rudern.levels';
+const KEY_HIDE_OFF = 'rudern.hideOff';
 const EMPTY = {boats: [], sessions: [], signups: [], version: null};
 
 // localStorage can throw (private mode, blocked storage); the app works without it.
@@ -87,6 +89,29 @@ function Main({token}) {
   const [sid, setSid] = useState(() => readHash().get('s') || '');
   const [toast, setToast] = useState('');
   const [showMine, setShowMine] = useState(false);
+  const [levels, setLevels] = useState(() => {
+    try {
+      // Older versions stored 'dhm-novice' and 'dhm-challenge'.
+      const renamed = {'dhm-novice': 'novice', 'dhm-challenge': 'fortgeschritten'};
+      const l = JSON.parse(store.get(KEY_LEVELS));
+      const kept = Array.isArray(l)
+        ? [...new Set(l.map((x) => renamed[x] || x))].filter((x) => LEVELS.some((v) => v.id === x))
+        : [];
+      if (kept.length) return kept;
+    } catch (err) { /* default */ }
+    return DEFAULT_LEVELS;
+  });
+  const [hideOff, setHideOff] = useState(() => store.get(KEY_HIDE_OFF) !== '0')   // default: only usable boats;
+  const toggleLevel = (id) => {
+    const next = levels.includes(id) ? levels.filter((l) => l !== id) : [...levels, id];
+    const out = next.length ? next : DEFAULT_LEVELS;   // never end up with nothing ticked
+    setLevels(out);
+    store.set(KEY_LEVELS, JSON.stringify(out));
+  };
+  const toggleHideOff = () => {
+    store.set(KEY_HIDE_OFF, hideOff ? '0' : '1');
+    setHideOff(!hideOff);
+  };
   const [jump, setJump] = useState(null);   // {sid, id, n}: scroll to and flash a boat after rendering
   const nameRef = useRef(null);
   const tabsRef = useRef(null);
@@ -299,21 +324,7 @@ function Main({token}) {
     return what;
   };
 
-  let body;
-  if (status === 'loading') {
-    body = html`<p class="info">${STR.loading}</p>`;
-  } else if (status === 'error') {
-    body = html`<div class="info"><p>${STR.offline}</p><button class="btn" onClick=${refresh}>${STR.retry}</button></div>`;
-  } else if (!current) {
-    body = html`<p class="info">${STR.noSessions}</p>`;
-  } else if (current.status !== 'aktiv') {
-    body = html`<p class="info">${STR.cancelled}</p>`;
-  } else {
-    body = html`${current.locked && html`<p class="banner">${STR.locked}</p>`}
-      <${Pool} me=${me} rows=${inSession.filter((r) => r.boat_id === UNSURE_ID)}
-        disabled=${!writable(true)} busy=${busy.has(`${currentId}|${UNSURE_ID}`)}
-        onPick=${() => choose(UNSURE_ID, null, true)} />
-      ${groups.map((g) => html`<${Group} key=${g.key} group=${g} me=${me}
+  const renderGroup = (g) => html`<${Group} key=${g.key} group=${g} me=${me}
         rows=${inSession.filter((r) => r.boat_id === `${CAT_PREFIX}${g.key}`)}
         seated=${inSession.filter((r) => r.seat !== null && g.boats.some((b) => b.bookable && b.boat_id === r.boat_id)).length
           + inSession.filter((r) => r.boat_id === `${CAT_PREFIX}${g.key}`).length}
@@ -328,7 +339,30 @@ function Main({token}) {
           locked=${current.locked}
           pendingSeats=${pendingSeats[`${currentId}|${boat.boat_id}`]}
           onSeat=${(seat) => choose(boat.boat_id, seat, boat.bookable)} />`)}
-      </${Group}>`)}`;
+      </${Group}>`;
+  const visible = groups
+    .map((g) => ({...g, boats: hideOff ? g.boats.filter((b) => b.bookable) : g.boats}))
+    .filter((g) => g.boats.length);
+  const shown = {
+    recommended: visible.filter((g) => isRecommended(g, levels)),
+    others: visible.filter((g) => !isRecommended(g, levels)),
+  };
+
+  let body;
+  if (status === 'loading') {
+    body = html`<p class="info">${STR.loading}</p>`;
+  } else if (status === 'error') {
+    body = html`<div class="info"><p>${STR.offline}</p><button class="btn" onClick=${refresh}>${STR.retry}</button></div>`;
+  } else if (!current) {
+    body = html`<p class="info">${STR.noSessions}</p>`;
+  } else if (current.status !== 'aktiv') {
+    body = html`<p class="info">${STR.cancelled}</p>`;
+  } else {
+    body = html`${current.locked && html`<p class="banner">${STR.locked}</p>`}
+${shown.recommended.length > 0 && shown.others.length > 0 && html`<h3 class="sep first">${STR.recommended}</h3>`}
+      ${shown.recommended.map(renderGroup)}
+      ${shown.recommended.length > 0 && shown.others.length > 0 && html`<h3 class="sep">${STR.otherBoats}</h3>`}
+      ${shown.others.map(renderGroup)}`;
   }
 
   return html`<div class="app">
@@ -351,8 +385,11 @@ function Main({token}) {
     <main class="main">
       ${fatal && html`<p class="banner error" role="alert">${fatal}</p>`}
       <${Weather} session=${current} />
-      ${status === 'ok' && current && current.status === 'aktiv' && html`<${Summary} total=${inSession.length}
-        cats=${groups.map((g) => summaryCat(g, inSession))} />`}
+      ${status === 'ok' && current && current.status === 'aktiv' && html`<${Summary}
+        rows=${inSession} boats=${boats} me=${me}
+        disabled=${!writable(true)} busy=${busy.has(`${currentId}|${UNSURE_ID}`)}
+        onPickUnsure=${() => choose(UNSURE_ID, null, true)} />`}
+      <${LevelBox} levels=${levels} hideOff=${hideOff} onLevel=${toggleLevel} onHideOff=${toggleHideOff} />
       ${body}
     </main>
     <footer class="bar">
@@ -406,32 +443,107 @@ function summaryCat(g, rows) {
   return {key: g.key, label: g.label, klasse: g.klasse, people, state};
 }
 
-function Summary({total, cats}) {
+// Sum of the session in people: N (no choice yet) + [full boats] + [started boats] + [overfull classes] = T.
+// People who chose "Egal welches Boot" are placed into free seats of their class right away (started boats
+// first), as if sorted into boats already. Whoever does not fit is "überfüllt". Empty groups are not shown.
+// Every boat shows taken/places, e.g. 4/4 for full and 3/4 for started boats. Each box opens a list.
+function Summary({rows, boats, me, disabled, busy, onPickUnsure}) {
+  const [open, setOpen] = useState(null);
+  const unsure = rows.filter((r) => r.boat_id === UNSURE_ID);
+  const units = [];
+  const over = [];
+  groupBoats(boats).forEach((g) => {
+    const bk = g.boats.filter((b) => b.bookable).map((boat) => ({
+      boat, crew: rows.filter((r) => r.boat_id === boat.boat_id && r.seat !== null),
+      cap: boat.seats + (boat.cox ? 1 : 0), extra: [],
+    }));
+    const rest = rows.filter((r) => r.boat_id === `${CAT_PREFIX}${g.key}`);
+    [...bk].sort((x, y) => (y.crew.length > 0) - (x.crew.length > 0))
+      .forEach((x) => { x.extra = rest.splice(0, Math.max(0, x.cap - x.crew.length)); });
+    units.push(...bk);
+    if (rest.length) over.push({label: g.label, rest});
+  });
+  const size = (x) => x.crew.length + x.extra.length;
+  const used = units.filter((x) => size(x) > 0);
+  const full = used.filter((x) => size(x) >= x.cap);
+  const started = used.filter((x) => size(x) < x.cap);
+  const total = unsure.length + used.reduce((n, x) => n + size(x), 0) + over.reduce((n, x) => n + x.rest.length, 0);
+  const mineUnsure = me !== '' && unsure.some((r) => sameName(r.member_id, me));
+  const toggle = (k) => setOpen(open === k ? null : k);
+  const caption = (k, label) => html`<span>${label}</span>`;
+  const box = (k, cls, n, label) => html`<button type="button" key=${k} class=${`sum-box ${cls}${open === k ? ' active' : ''}`}
+    aria-expanded=${open === k ? 'true' : 'false'} title=${label} onClick=${() => toggle(k)}>
+    <strong>${n}</strong>${caption(k, label)}</button>`;
+  // A bracket: one part per boat (or class), joined by "+".
+  const bracket = (k, cls, label, parts) => html`<button type="button" key=${k}
+    class=${`sum-box ${cls}${open === k ? ' active' : ''}`}
+    aria-expanded=${open === k ? 'true' : 'false'} title=${label} onClick=${() => toggle(k)}>
+    <span class="parts">${parts.map((p, i) => [
+      i > 0 && html`<span class="plus" key=${`p${i}`}>+</span>`,
+      html`<span class="part" key=${i}>${p}</span>`,
+    ])}</span>${caption(k, label)}</button>`;
+  const fraction = (x) => html`<strong>${size(x)}<small class="cap">/${x.cap}</small></strong>`;
+  const crewText = (x) => [...seatList(x.crew), ...x.extra.map((r) => `${r.member_id} (${STR.noSeatYet})`)].join(', ');
+  const boatList = (list) => html`<ul class="sum-list">${list.map((x) => html`<li key=${x.boat.boat_id}>
+    <strong>${x.boat.name}</strong> <span class="muted">${x.boat.klasse} [${size(x)}/${x.cap}]</span>: ${crewText(x)}</li>`)}</ul>`;
+  const groups = [
+    unsure.length > 0 && {k: 'n', node: box('n', 'n', unsure.length, STR.noChoice)},
+    full.length > 0 && {k: 'g', node: bracket('g', 'g', STR.fullBoats, full.map(fraction))},
+    started.length > 0 && {k: 'a', node: bracket('a', 'a', STR.startedBoats, started.map(fraction))},
+    over.length > 0 && {k: 'o', node: bracket('o', 'o', STR.overfull,
+      over.map((x) => html`<strong>${x.rest.length}</strong>`))},
+  ].filter(Boolean);
   return html`<section class="sum" aria-label=${STR.summary}>
-    <span class="sum-total"><strong>${total}</strong> ${STR.participants}</span>
-    <span class="sum-cats">${cats.map((c) => html`<span key=${c.key} class=${`sum-cat ${c.state}`}
-      title=${`${c.label}: ${c.people}`}>${c.klasse}</span>`)}</span>
+    <div class="sum-eq">
+      ${groups.map((g, i) => (i === 0 ? g.node
+        : html`<span class="grp" key=${`grp${g.k}`}><span class="op">+</span>${g.node}</span>`))}
+      <span class="grp"><span class="op">${groups.length > 0 ? '=' : ''}</span>
+        <span class="sum-box t" title=${STR.total}><strong>${total}</strong><span>${STR.total}</span></span></span>
+    </div>
+    ${open === 'n' && html`<div class="sum-detail">
+      ${unsure.length
+        ? html`<p class="sum-names">${unsure.map((r) => r.member_id).join(', ')}</p>`
+        : html`<p class="muted">${STR.nobody}</p>`}
+      <button type="button" class="btn" aria-pressed=${mineUnsure ? 'true' : 'false'}
+        disabled=${disabled || busy} onClick=${onPickUnsure}>
+        ${mineUnsure ? STR.poolLeave : STR.poolJoin}</button>
+    </div>`}
+    ${open === 'g' && html`<div class="sum-detail">${boatList(full)}</div>`}
+    ${open === 'a' && html`<div class="sum-detail">${boatList(started)}</div>`}
+    ${open === 'o' && html`<div class="sum-detail"><ul class="sum-list">${over.map((x) => html`<li key=${x.label}>
+      <strong>${x.label}</strong>: ${x.rest.map((r) => r.member_id).join(', ')}</li>`)}</ul></div>`}
+  </section>`;
+}
+
+// "Level": which boats are recommended to me, plus a switch to hide boats that cannot be used.
+function LevelBox({levels, hideOff, onLevel, onHideOff}) {
+  const [info, setInfo] = useState(false);
+  return html`<section class="level" aria-label=${STR.level}>
+    <div class="level-head">
+      <h2>${STR.level}</h2>
+      <button type="button" class="info-btn" aria-expanded=${info ? 'true' : 'false'}
+        aria-label=${STR.levelInfoLabel} title=${STR.levelInfoLabel} onClick=${() => setInfo(!info)}>i</button>
+    </div>
+    ${info && html`<div class="level-info">
+      <p>${STR.levelInfo}</p>
+      <ul>${LEVELS.map((l) => html`<li key=${l.id}><strong>${l.label}:</strong> ${l.info}</li>`)}</ul>
+    </div>`}
+    <div class="level-opts">
+      ${LEVELS.map((l) => html`<label key=${l.id} class="check">
+        <input type="checkbox" checked=${levels.includes(l.id)} onChange=${() => onLevel(l.id)} />
+        <span>${l.label}</span>
+      </label>`)}
+    </div>
+    <label class="check level-hide">
+      <input type="checkbox" checked=${hideOff} onChange=${onHideOff} />
+      <span>${STR.hideOff}</span>
+    </label>
   </section>`;
 }
 
 function Dot({name, me}) {
   const mine = me !== '' && sameName(name, me);
   return html`<span class=${`dot${mine ? ' mine' : ''}`} title=${name}>${initials(name)}</span>`;
-}
-
-// "Noch ohne Wahl": tap to say you don't know yet which boat; shows everyone who did.
-function Pool({me, rows, disabled, busy, onPick}) {
-  const mine = me ? rows.find((r) => sameName(r.member_id, me)) : null;
-  return html`<section class="pool" aria-label=${STR.pool}>
-    <button type="button" class="any" aria-pressed=${mine ? 'true' : 'false'}
-      disabled=${disabled || busy} onClick=${onPick}>
-      <span class="what">${STR.pool}</span>
-      <span class="dots">${rows.length
-        ? rows.map((r) => html`<${Dot} key=${r.member_id} name=${r.member_id} me=${me} />`)
-        : html`<span class="dot empty" aria-hidden="true"></span>`}</span>
-      <span class="counter">[${rows.length}]</span>
-    </button>
-  </section>`;
 }
 
 function Group({group, me, rows, seated, places, fill, disabled, busy, reveal, onPick, children}) {
