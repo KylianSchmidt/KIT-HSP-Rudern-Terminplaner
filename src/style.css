@@ -321,9 +321,7 @@ svg.boat.disabled { opacity: .5; }
   border: 1px solid var(--border);
   border-radius: 10px;
   text-align: left;
-  cursor: pointer;
 }
-.mine-item span { display: block; font-size: 14px; color: var(--muted); }
 .toast {
   position: absolute;
   left: 12px;
@@ -354,3 +352,16 @@ svg.boat.disabled { opacity: .5; }
 .sum-cat { padding: 1px 8px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; }
 .sum-cat.open { background: #f59e0b; border-color: #f59e0b; color: #1b2530; }
 .sum-cat.full { background: var(--red); border-color: var(--red); color: #fff; }
+
+/* own choice: stands out from other rowers, and can be jumped to */
+.card, .group { scroll-margin-top: 130px; }
+.card.has-mine { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.badge.mine { background: var(--accent); color: var(--accent-fg); }
+.flash { animation: flash 1.6s ease-out; }
+@keyframes flash { 0%, 40% { box-shadow: 0 0 0 4px var(--focus); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) { .flash { animation: none; } }
+.mine-session { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 4px 0; }
+.mine-row { display: flex; gap: 6px; align-items: stretch; margin-bottom: 4px; }
+.mine-go { flex: 1; text-align: left; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+.mine-remove { width: 44px; font-size: 22px; line-height: 1; background: var(--card); border: 1px solid var(--border); border-radius: 8px; color: var(--red); }
+.mine-remove:disabled { opacity: .4; }

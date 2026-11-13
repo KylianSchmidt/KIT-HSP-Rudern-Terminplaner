@@ -87,6 +87,7 @@ function Main({token}) {
   const [sid, setSid] = useState(() => readHash().get('s') || '');
   const [toast, setToast] = useState('');
   const [showMine, setShowMine] = useState(false);
+  const [jump, setJump] = useState(null);   // {sid, id, n}: scroll to and flash a boat after rendering
   const nameRef = useRef(null);
   const tabsRef = useRef(null);
   const toastTimer = useRef(0);
@@ -200,6 +201,26 @@ function Main({token}) {
     });
   };
 
+  useEffect(() => {
+    if (!jump || jump.sid !== currentId) return undefined;
+    const raf = requestAnimationFrame(() => {
+      const el = document.getElementById(jump.id);
+      if (!el) return;
+      el.scrollIntoView({behavior: 'smooth', block: 'center'});
+      el.classList.remove('flash');
+      void el.offsetWidth;   // restart the animation
+      el.classList.add('flash');
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [jump, currentId]);
+
+  // "My dates" panel: show the chosen boat, or give the choice up again.
+  const showChoice = (s, row) => {
+    selectSession(s.session_id);
+    setJump({sid: s.session_id, id: anchorId(row.boat_id), n: Date.now()});
+  };
+  const unchoose = (s, row) => submit({type: 'remove', sid: s.session_id, member: me, boat: row.boat_id, seat: row.seat});
+
   const needName = () => {
     if (me) return false;
     showToast(STR.needName);
@@ -300,6 +321,7 @@ function Main({token}) {
         places=${g.boats.reduce((n, b) => n + (b.bookable ? b.seats + (b.cox ? 1 : 0) : 0), 0)}
         disabled=${!writable(g.boats.some((b) => b.bookable))}
         busy=${busy.has(`${currentId}|${CAT_PREFIX}${g.key}`)}
+        reveal=${jump && jump.sid === currentId ? jump.n : 0}
         onPick=${() => choose(`${CAT_PREFIX}${g.key}`, null, true)}>
         ${g.boats.map((boat) => html`<${BoatCard} key=${boat.boat_id} boat=${boat} me=${me}
           rows=${inSession.filter((r) => r.boat_id === boat.boat_id)}
@@ -337,11 +359,18 @@ function Main({token}) {
       ${toast && html`<div class="toast" role="status">${toast}</div>`}
       ${showMine && html`<section class="mine" aria-label=${STR.myDates}>
         ${mineBySession.length
-          ? mineBySession.map(({s, rows}) => html`<button key=${s.session_id} class="mine-item" type="button"
-              onClick=${() => selectSession(s.session_id)}>
-              <strong>${sessionLabel(s)}</strong>
-              <span>${rows.map(choiceLabel).join(' · ')}</span>
-            </button>`)
+          ? mineBySession.map(({s, rows}) => html`<div key=${s.session_id} class="mine-item">
+              <button class="mine-session" type="button" onClick=${() => selectSession(s.session_id)}>
+                <strong>${sessionLabel(s)}</strong>
+              </button>
+              ${rows.map((r) => html`<div key=${`${r.boat_id}|${r.seat}`} class="mine-row">
+                <button class="mine-go" type="button" title=${STR.showBoat} onClick=${() => showChoice(s, r)}>
+                  ${choiceLabel(r)}
+                </button>
+                <button class="mine-remove" type="button" aria-label=${STR.unselect} title=${STR.unselect}
+                  disabled=${s.locked || s.status !== 'aktiv'} onClick=${() => unchoose(s, r)}>×</button>
+              </div>`)}
+            </div>`)
           : html`<p class="muted">${STR.noneMine}</p>`}
       </section>`}
       <div class="bar-row">
@@ -355,6 +384,9 @@ function Main({token}) {
     </footer>
   </div>`;
 }
+
+// DOM id for scrolling to a boat card or a boat class.
+const anchorId = (boatId) => `pick-${String(boatId).replace(/[^\w-]+/g, '_')}`;
 
 // Fill state of a boat class: 'full' (all places taken), 'open' (some boat is partly filled), else 'none'.
 // People who chose "Egal welches Boot" count as participants of the class but don't occupy a seat yet.
@@ -402,9 +434,10 @@ function Pool({me, rows, disabled, busy, onPick}) {
   </section>`;
 }
 
-function Group({group, me, rows, seated, places, fill, disabled, busy, onPick, children}) {
+function Group({group, me, rows, seated, places, fill, disabled, busy, reveal, onPick, children}) {
   const [open, setOpen] = useState(true);
-  return html`<section class=${`group${open ? '' : ' collapsed'}`}>
+  useEffect(() => { if (reveal) setOpen(true); }, [reveal]);
+  return html`<section id=${anchorId(`${CAT_PREFIX}${group.key}`)} class=${`group${open ? '' : ' collapsed'}`}>
     <button type="button" class="group-toggle" aria-expanded=${open ? 'true' : 'false'}
       onClick=${() => setOpen(!open)}>
       <h2 class="group-title">${group.label}</h2>
@@ -430,11 +463,12 @@ function GroupHead({group, me, rows, disabled, busy, onPick}) {
 }
 
 function BoatCard({boat, me, rows, locked, pendingSeats, onSeat}) {
+  const mine = me !== '' && rows.some((r) => sameName(r.member_id, me));
   const seated = rows.filter((r) => r.seat !== null);
   const places = boat.seats + (boat.cox ? 1 : 0);
   const off = !boat.bookable;
   const frozen = locked || off;
-  return html`<article class=${`card${off ? ' off' : ''}`}>
+  return html`<article id=${anchorId(boat.boat_id)} class=${`card${off ? ' off' : ''}${mine ? ' has-mine' : ''}`}>
     <div class="card-head">
       <h2>${boat.name}</h2>
       <span class="badge">${boat.klasse}</span>
@@ -442,6 +476,7 @@ function BoatCard({boat, me, rows, locked, pendingSeats, onSeat}) {
         title=${seated.length >= places ? STR.full : ''}>[${seated.length}/${places}]</span>
       ${seated.length >= places && html`<span class="badge full">${STR.fullShort}</span>`}
       ${off && html`<span class="badge warn">${STR.notBookable}</span>`}
+      ${mine && html`<span class="badge mine">${STR.you}</span>`}
     </div>
     ${boat.notes && html`<p class="muted notes">${boat.notes}</p>`}
     <${BoatDiagram} boat=${boat} signups=${seated} me=${me} disabled=${frozen}

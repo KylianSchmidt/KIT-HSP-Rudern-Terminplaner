@@ -9,6 +9,9 @@ export const STR = {
   locked: 'Anmeldung geschlossen',
   notBookable: 'nicht befahrbar',
   myDates: 'Meine Termine',
+  showBoat: 'Zum Boot springen',
+  unselect: 'Auswahl entfernen',
+  you: 'Du',
   share: 'In WhatsApp teilen',
   offline: 'Keine Verbindung, bitte erneut versuchen',
   err: {

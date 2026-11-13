@@ -102,6 +102,15 @@ function bump_() {
   cache.remove('state');
 }
 
+// Status values as they appear in the Sheet dropdown. Compared case-insensitively so that
+// "Abgesagt", "abgesagt" and "ABGESAGT" all mean the same; the API always gets lowercase.
+const STATUS_ACTIVE = 'Aktiv';
+const STATUS_CANCELLED = 'Abgesagt';
+
+function isCancelled_(status) {
+  return String(status || '').trim().toLowerCase() === STATUS_CANCELLED.toLowerCase();
+}
+
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
@@ -138,7 +147,7 @@ function buildState_() {
         date,
         start,
         end: fmt_(r.Ende, 'HH:mm'),
-        status: String(r.Status || 'aktiv'),
+        status: isCancelled_(r.Status) ? 'abgesagt' : 'aktiv',
         locked: startMs_(date, start) - lockMs < now,
       };
     })
@@ -254,12 +263,14 @@ function write_(p) {
 
 function listEvents_(calId) {
   const now = new Date();
-  const until = new Date(now.getTime() + DAYS_AHEAD * 864e5);
+  // Start at midnight (script time zone), not "now": events earlier today must stay in the window.
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const until = new Date(from.getTime() + DAYS_AHEAD * 864e5);
   const items = [];
   let pageToken;
   do {
     const res = Calendar.Events.list(calId, {
-      timeMin: now.toISOString(),
+      timeMin: from.toISOString(),
       timeMax: until.toISOString(),
       singleEvents: true,
       showDeleted: true,
@@ -341,8 +352,8 @@ function syncEvents() {
 
       if (!isMatch) {
         // Deleted, marker removed or turned into an all-day event: cancel the session.
-        if (existing && String(existing.Status) !== 'abgesagt') {
-          update_(t, existing, {Status: 'abgesagt'});
+        if (existing && !isCancelled_(existing.Status)) {
+          update_(t, existing, {Status: STATUS_CANCELLED});
           changed = true;
         }
         // Marker removed from a live event: take our block out of its description.
@@ -360,7 +371,7 @@ function syncEvents() {
         Datum: fmt_(start, 'yyyy-MM-dd'),
         Beginn: fmt_(start, 'HH:mm'),
         Ende: fmt_(end, 'HH:mm'),
-        Status: 'aktiv',
+        Status: STATUS_ACTIVE,
       };
       if (!existing) {
         append_(t, row);
@@ -371,8 +382,11 @@ function syncEvents() {
           Datum: fmt_(existing.Datum, 'yyyy-MM-dd'),
           Beginn: fmt_(existing.Beginn, 'HH:mm'),
           Ende: fmt_(existing.Ende, 'HH:mm'),
-          Status: String(existing.Status),
         };
+        // A matching event is live again (e.g. the marker was re-added): reactivate, but never
+        // rewrite the status text just because of capitalisation.
+        if (isCancelled_(existing.Status)) now.Status = String(existing.Status);
+        else row.Status = String(existing.Status || STATUS_ACTIVE);
         if (Object.keys(now).some((k) => now[k] !== row[k])) {
           update_(t, existing, row);
           changed = true;
